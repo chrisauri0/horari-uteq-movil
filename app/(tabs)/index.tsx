@@ -1,77 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
-import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet, ScrollView, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-
-
-
-
-const DAYS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie'];
-const HOURS = [17, 18, 19, 20, 21];
-
-const ScheduleTable = ({ data }: { data: any[] }) => {
-  // Crear matriz vacía
-  const matrix: any = {};
-  HOURS.forEach((h) => {
-    matrix[h] = {};
-    DAYS.forEach((d) => (matrix[h][d] = null));
-  });
-
-  // Llenar la matriz con las materias
-  data.forEach((c) => {
-    const slot = c.start; // Ejemplo: "Lun18"
-    const dia = slot.slice(0, 3);
-    const hora = parseInt(slot.slice(3));
-    if (matrix[hora] && matrix[hora][dia] !== undefined) {
-      matrix[hora][dia] = c;
-    }
-  });
-
-  return (
-    <ThemedView style={styles.tableContainer}>
-      {/* Encabezado */}
-      <ThemedView style={[styles.row, styles.headerRow]}>
-        <ThemedText style={[styles.cell, styles.headerCell]}>Hora</ThemedText>
-        {DAYS.map((d) => (
-          <ThemedText key={d} style={[styles.cell, styles.headerCell]}>
-            {d}
-          </ThemedText>
-        ))}
-      </ThemedView>
-
-      {/* Filas */}
-      {HOURS.map((h) => (
-        <ThemedView key={h} style={styles.row}>
-          <ThemedText style={[styles.cell, styles.hourCell]}>
-            {h}:00
-          </ThemedText>
-          {DAYS.map((d) => {
-            const c = matrix[h][d];
-            return (
-              <ThemedView key={d} style={[styles.cell, styles.subjectCell]}>
-                {c ? (
-                  <>
-                    <ThemedText style={styles.subjText}>{c.subj}</ThemedText>
-                    <ThemedText style={styles.profText}>{c.prof}</ThemedText>
-                    <ThemedText style={styles.roomText}>{c.room}</ThemedText>
-                  </>
-                ) : (
-                  <ThemedText style={styles.emptyText}>–</ThemedText>
-                )}
-              </ThemedView>
-            );
-          })}
-        </ThemedView>
-      ))}
-    </ThemedView>
-  );
-};
+import { ScheduleTable } from '@/components/ui';
+import { Card } from '@/components/ui';
+import { UTEQColors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 
 export default function HomeScreen() {
@@ -79,6 +17,8 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [horarios, setHorarios] = useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const fetchUserAndHorarios = async () => {
@@ -105,126 +45,151 @@ export default function HomeScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.titleContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <ThemedText>Cargando...</ThemedText>
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={UTEQColors.bluePrimary} />
+        <ThemedText style={styles.loadingText}>Cargando...</ThemedText>
       </ThemedView>
     );
   }
 
+  const selectedHorario = horarios.find((h) => h.id === selectedGroup);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Bienvenido, {user?.full_name || 'Invitado'}!</ThemedText>
-        <HelloWave />
-      </ThemedView>
+    <ThemedView style={styles.container}>
+      {/* Header con color azul */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <ThemedText style={styles.welcomeText}>¡Bienvenido!</ThemedText>
+          <ThemedText style={styles.userName}>{user?.full_name || 'Invitado'}</ThemedText>
+        </View>
+      </View>
 
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Selecciona un grupo:</ThemedText>
-        <Picker
-          selectedValue={selectedGroup}
-          onValueChange={(itemValue: string) => setSelectedGroup(itemValue)}
-          style={{ color: '#000', backgroundColor: '#fff' }}>
-          {horarios.map((horario) => (
-            <Picker.Item key={horario.id} label={horario.nombregrupo} value={horario.id} />
-          ))}
-        </Picker>
-      </ThemedView>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        
+        {/* Card de selección de grupo */}
+        <Card variant="elevated" style={styles.card}>
+          <ThemedText style={styles.cardTitle}>Selecciona un grupo</ThemedText>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={selectedGroup}
+              onValueChange={(itemValue: string) => setSelectedGroup(itemValue)}
+              style={[
+                styles.picker,
+                { color: colors.text, backgroundColor: colors.background }
+              ]}
+              dropdownIconColor={UTEQColors.bluePrimary}>
+              <Picker.Item label="Seleccione un grupo" value="" />
+              {horarios.map((horario) => (
+                <Picker.Item
+                  key={horario.id}
+                  label={horario.nombregrupo}
+                  value={horario.id}
+                />
+              ))}
+            </Picker>
+          </View>
+        </Card>
 
-      {selectedGroup && (
-        <ThemedView style={styles.stepContainer}>
-          <ThemedText type="subtitle">Datos del grupo seleccionado:</ThemedText>
-{selectedGroup && (
-  <ThemedView style={styles.stepContainer}>
-    <ThemedText type="subtitle">Horario del grupo seleccionado:</ThemedText>
-    <ScheduleTable
-      data={horarios.find((h) => h.id === selectedGroup)?.data || []}
-    />
-  </ThemedView>
-)}
+        {/* Horario del grupo seleccionado */}
+        {selectedGroup && selectedHorario && (
+          <Card variant="elevated" style={styles.scheduleCard}>
+            <ThemedText style={styles.cardTitle}>
+              Horario - {selectedHorario.nombregrupo}
+            </ThemedText>
+            <ScheduleTable data={selectedHorario.data || []} />
+          </Card>
+        )}
 
-        </ThemedView>
-      )}
-    </ParallaxScrollView>
+        {!selectedGroup && (
+          <Card variant="outlined" style={styles.emptyCard}>
+            <ThemedText style={styles.emptyText}>
+              Selecciona un grupo para ver su horario
+            </ThemedText>
+          </Card>
+        )}
+      </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: UTEQColors.gray50,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: UTEQColors.white,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: FontSizes.base,
+    color: UTEQColors.textSecondary,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  header: {
+    paddingTop: Spacing.xl + 20,
+    paddingBottom: Spacing.xl,
+    paddingHorizontal: Spacing.lg,
+    borderBottomLeftRadius: BorderRadius['2xl'],
+    borderBottomRightRadius: BorderRadius['2xl'],
+    backgroundColor: UTEQColors.bluePrimary,
   },
-
-  tableContainer: {
-  borderWidth: 1,
-  borderColor: '#aaa',
-  borderRadius: 8,
-  overflow: 'hidden',
-  marginTop: 10,
-},
-row: {
-  flexDirection: 'row',
-},
-cell: {
-  flex: 1,
-  borderWidth: 1,
-  borderColor: '#ccc',
-  padding: 6,
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-headerRow: {
-  backgroundColor: '#eee',
-},
-headerCell: {
-  fontWeight: 'bold',
-  textAlign: 'center',
-},
-hourCell: {
-  backgroundColor: '#f9f9f9',
-  width: 60,
-},
-subjectCell: {
-  flex: 1,
-  minHeight: 60,
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-subjText: {
-  fontWeight: 'bold',
-  textAlign: 'center',
-},
-profText: {
-  fontSize: 12,
-  color: '#555',
-  textAlign: 'center',
-},
-roomText: {
-  fontSize: 11,
-  color: '#888',
-  textAlign: 'center',
-},
-emptyText: {
-  color: '#ccc',
-},
-
+  headerContent: {
+    alignItems: 'flex-start',
+  },
+  welcomeText: {
+    fontSize: FontSizes.xl,
+    color: UTEQColors.white,
+    marginBottom: Spacing.xs,
+    fontWeight: '600',
+  },
+  userName: {
+    fontSize: FontSizes['2xl'],
+    color: UTEQColors.white,
+    fontWeight: '700',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: Spacing.md,
+    paddingBottom: Spacing.xl,
+  },
+  card: {
+    marginBottom: Spacing.md,
+  },
+  cardTitle: {
+    fontSize: FontSizes.lg,
+    fontWeight: '700',
+    color: UTEQColors.textPrimary,
+    marginBottom: Spacing.md,
+  },
+  pickerContainer: {
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: UTEQColors.gray300,
+  },
+  picker: {
+    height: 50,
+  },
+  scheduleCard: {
+    marginBottom: Spacing.md,
+  },
+  emptyCard: {
+    padding: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 100,
+  },
+  emptyText: {
+    fontSize: FontSizes.base,
+    color: UTEQColors.textSecondary,
+    textAlign: 'center',
+  },
 });

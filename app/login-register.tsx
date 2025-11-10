@@ -2,7 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Button, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, View, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Button } from '@/components/ui';
+import { Input } from '@/components/ui';
+import { Card } from '@/components/ui';
+import { UTEQColors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 
 const LoginRegisterScreen = () => {
   const router = useRouter();
@@ -56,92 +62,132 @@ const horariosResponse = await axios.get(`${API_BASE_URL}/horarios`);
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{isLogin ? 'Login' : 'Register'}</Text>
-      <Text style={styles.label}>Solo se aceptan correos con terminación @uteq.edu.mx</Text>
+    <ThemedView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          
+          {/* Header */}
+          <View style={styles.header}>
+            <ThemedText style={styles.title}>{isLogin ? 'Iniciar Sesión' : 'Registrarse'}</ThemedText>
+            <ThemedText style={styles.subtitle}>
+              {isLogin
+                ? 'Ingresa a tu cuenta UTEQ'
+                : 'Crea una nueva cuenta UTEQ'}
+            </ThemedText>
+          </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
+          {/* Card con formulario */}
+          <Card variant="elevated" style={styles.card}>
+            <ThemedText style={styles.infoText}>
+              Solo se aceptan correos con terminación @uteq.edu.mx
+            </ThemedText>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+            <Input
+              label="Correo electrónico"
+              placeholder="tu.correo@uteq.edu.mx"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
 
-      {!isLogin && (
-        <TextInput
-          style={styles.input}
-          placeholder="Full Name"
-          value={fullName}
-          onChangeText={setFullName}
-        />
-      )}
+            <Input
+              label="Contraseña"
+              placeholder="Ingresa tu contraseña"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              autoCapitalize="none"
+            />
 
-      <View style={styles.buttonContainer}>
-        <Button title={isLogin ? 'Login' : 'Register'} onPress={handleAuth} />
-      </View>
+            {!isLogin && (
+              <Input
+                label="Nombre completo"
+                placeholder="Juan Pérez"
+                value={fullName}
+                onChangeText={setFullName}
+                autoCapitalize="words"
+              />
+            )}
 
-      <View style={styles.buttonContainer}>
-        <Button
-          title={isLogin ? 'Switch to Register' : 'Switch to Login'}
-          onPress={() => setIsLogin(!isLogin)}
-        />
-      </View>
-    </View>
+            <Button
+              title={isLogin ? 'Iniciar Sesión' : 'Registrarse'}
+              onPress={handleAuth}
+              variant="primary"
+              fullWidth
+              style={styles.primaryButton}
+            />
+
+            <Button
+              title={isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión'}
+              onPress={() => setIsLogin(!isLogin)}
+              variant="ghost"
+              fullWidth
+              style={styles.switchButton}
+            />
+          </Card>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ThemedView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: UTEQColors.gray50,
+  },
+  keyboardView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  header: {
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f9f9f9',
+    marginBottom: Spacing.xl,
+    paddingTop: Spacing['2xl'],
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    textAlign: 'center',
-    color: '#333',
-  },
-  input: {
-    width: '100%',
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-    backgroundColor: '#fff',
-    fontSize: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  label: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
+    fontSize: FontSizes['4xl'],
+    fontWeight: '700',
+    color: UTEQColors.bluePrimary,
+    marginBottom: Spacing.sm,
     textAlign: 'center',
   },
-  buttonContainer: {
+  subtitle: {
+    fontSize: FontSizes.base,
+    color: UTEQColors.textSecondary,
+    textAlign: 'center',
+  },
+  card: {
+    maxWidth: 500,
     width: '100%',
-    maxWidth: 400,
-    marginVertical: 8,
-    alignItems: 'center',
+    alignSelf: 'center',
+  },
+  infoText: {
+    fontSize: FontSizes.sm,
+    color: UTEQColors.textSecondary,
+    marginBottom: Spacing.lg,
+    textAlign: 'center',
+    padding: Spacing.sm,
+    backgroundColor: UTEQColors.blueLightest,
+    borderRadius: BorderRadius.md,
+  },
+  primaryButton: {
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  switchButton: {
+    marginTop: Spacing.sm,
   },
 });
 

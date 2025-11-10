@@ -3,7 +3,13 @@ import { ThemedView } from '@/components/themed-view';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Button, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { ScheduleTable } from '@/components/ui';
+import { Card } from '@/components/ui';
+import { Button } from '@/components/ui';
+import { UTEQColors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
 
 const DAYS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie'];
 const HOURS = [17, 18, 19, 20, 21];
@@ -15,6 +21,8 @@ export default function ScheduleByProfScreen() {
   const [selectedProf, setSelectedProf] = useState('');
   const [selectedDay, setSelectedDay] = useState('');
   const [selectedHour, setSelectedHour] = useState('');
+  const colorScheme = useColorScheme() ?? 'light';
+  const colors = Colors[colorScheme];
 
   useEffect(() => {
     const fetchHorarios = async () => {
@@ -39,9 +47,9 @@ export default function ScheduleByProfScreen() {
 
   if (loading) {
     return (
-      <ThemedView style={styles.center}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <ThemedText>Cargando...</ThemedText>
+      <ThemedView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={UTEQColors.bluePrimary} />
+        <ThemedText style={styles.loadingText}>Cargando...</ThemedText>
       </ThemedView>
     );
   }
@@ -56,186 +64,253 @@ export default function ScheduleByProfScreen() {
   });
 
   return (
-    <ScrollView style={{ padding: 10 }}>
-      <ThemedView style={{ padding: 10, alignItems: 'center' }}>
-        <ThemedText type="title" style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10 }}>
-          Apartado de Profesores
+    <ThemedView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <ThemedText style={styles.headerTitle}>Horarios por Profesor</ThemedText>
+        <ThemedText style={styles.headerSubtitle}>
+          Consulta los horarios de tus profesores y agenda asesorías
         </ThemedText>
-      </ThemedView>
-      {Object.keys(profs)
-        .sort()
-        .map((prof) => {
-          const clases = profs[prof];
+      </View>
 
-          // Crear matriz [dia][hora]
-          const matrix: Record<string, Record<number, any | null>> = {};
-          DAYS.forEach((d) => {
-            matrix[d] = {};
-            HOURS.forEach((h) => (matrix[d][h] = null));
-          });
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        {Object.keys(profs)
+          .sort()
+          .map((prof) => {
+            const clases = profs[prof];
+            
+            // Preparar datos para ScheduleTable
+            const scheduleData = clases.map((c: any) => ({
+              start: c.start,
+              subj: c.subj,
+              prof: c.prof,
+              room: c.room,
+              group: c.group,
+            }));
 
-          clases.forEach((c) => {
-            const dia = c.start.slice(0, 3);
-            const hora = parseInt(c.start.slice(3));
-            matrix[dia][hora] = c;
-          });
+            return (
+              <Card key={prof} variant="elevated" style={styles.professorCard}>
+                <ThemedText style={styles.professorName}>{prof}</ThemedText>
+                
+                <ScheduleTable
+                  data={scheduleData}
+                  showGroup={true}
+                />
 
-          return (
-            <ThemedView key={prof} style={{ marginBottom: 30 }}>
-              <ThemedText type="title">{prof}</ThemedText>
+                <Button
+                  title={`Agendar asesoría con ${prof}`}
+                  onPress={() => openModal(prof)}
+                  variant="secondary"
+                  fullWidth
+                  style={styles.scheduleButton}
+                />
+              </Card>
+            );
+          })}
 
-              {/* Tabla */}
-              <ThemedView style={styles.tableContainer}>
-                {/* Header */}
-                <ThemedView style={[styles.row, styles.headerRow]}>
-                  <ThemedText style={[styles.cell, styles.headerCell]}>Hora</ThemedText>
-                  {DAYS.map((d) => (
-                    <ThemedText key={d} style={[styles.cell, styles.headerCell]}>
-                      {d}
-                    </ThemedText>
-                  ))}
-                </ThemedView>
+        {Object.keys(profs).length === 0 && (
+          <Card variant="outlined" style={styles.emptyCard}>
+            <ThemedText style={styles.emptyText}>
+              No hay profesores disponibles
+            </ThemedText>
+          </Card>
+        )}
+      </ScrollView>
 
-                {/* Filas */}
-                {HOURS.map((h) => (
-                  <ThemedView key={h} style={styles.row}>
-                    <ThemedText style={[styles.cell, styles.hourCell]}>{h}:00</ThemedText>
-                    {DAYS.map((d) => {
-                      const c = matrix[d][h];
-                      return (
-                        <ThemedView key={d} style={[styles.cell, styles.subjectCell]}>
-                          {c ? (
-                            <>
-                              <ThemedText style={styles.subjText}>{c.group}</ThemedText>
-                              <ThemedText style={styles.profText}>{c.subj}</ThemedText>
-                              <ThemedText style={styles.roomText}>{c.room}</ThemedText>
-                            </>
-                          ) : (
-                            <ThemedText style={styles.emptyText}>–</ThemedText>
-                          )}
-                        </ThemedView>
-                      );
-                    })}
-                  </ThemedView>
-                ))}
-              </ThemedView>
-
-              {/* Botón para agendar asesoría */}
-              <Button title={`Agendar asesoría con ${prof}`} onPress={() => openModal(prof)} />
-            </ThemedView>
-          );
-        })}
-
-      {/* Modal */}
+      {/* Modal para agendar asesoría */}
       <Modal visible={modalVisible} transparent={true} animationType="slide">
         <View style={styles.modalContainer}>
-          <ThemedView style={styles.modalContent}>
-            <ThemedText style={[styles.modalText, { color: '#000' }]}>Agendar asesoría con {selectedProf}</ThemedText>
+          <View style={styles.modalBackdrop} />
+          <Card variant="elevated" style={styles.modalContent}>
+            <ThemedText style={styles.modalTitle}>
+              Agendar asesoría con {selectedProf}
+            </ThemedText>
+
+            <ThemedText style={styles.modalSubtitle}>
+              Selecciona el día y la hora para tu asesoría
+            </ThemedText>
 
             {/* Selector de día */}
-            <Picker
-              selectedValue={selectedDay}
-              onValueChange={(itemValue) => setSelectedDay(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="Seleccione un día" value="" />
-              {DAYS.map((day) => (
-                <Picker.Item key={day} label={day} value={day} />
-              ))}
-            </Picker>
+            <View style={styles.pickerContainer}>
+              <ThemedText style={styles.pickerLabel}>Día</ThemedText>
+              <Picker
+                selectedValue={selectedDay}
+                onValueChange={(itemValue) => setSelectedDay(itemValue)}
+                style={[
+                  styles.picker,
+                  { color: colors.text, backgroundColor: colors.background }
+                ]}
+                dropdownIconColor={UTEQColors.bluePrimary}>
+                <Picker.Item label="Seleccione un día" value="" />
+                {DAYS.map((day) => (
+                  <Picker.Item key={day} label={day} value={day} />
+                ))}
+              </Picker>
+            </View>
 
             {/* Selector de hora */}
-            <Picker
-              selectedValue={selectedHour}
-              onValueChange={(itemValue) => setSelectedHour(itemValue)}
-              style={styles.picker}
-            >
-              <Picker.Item label="Seleccione una hora" value="" />
-              {HOURS.map((hour) => (
-                <Picker.Item key={hour} label={`${hour}:00`} value={hour} />
-              ))}
-            </Picker>
+            <View style={styles.pickerContainer}>
+              <ThemedText style={styles.pickerLabel}>Hora</ThemedText>
+              <Picker
+                selectedValue={selectedHour}
+                onValueChange={(itemValue) => setSelectedHour(itemValue)}
+                style={[
+                  styles.picker,
+                  { color: colors.text, backgroundColor: colors.background }
+                ]}
+                dropdownIconColor={UTEQColors.bluePrimary}>
+                <Picker.Item label="Seleccione una hora" value="" />
+                {HOURS.map((hour) => (
+                  <Picker.Item key={hour} label={`${hour}:00`} value={hour.toString()} />
+                ))}
+              </Picker>
+            </View>
 
-            <Button title="Cerrar" onPress={closeModal} />
-          </ThemedView>
+            <View style={styles.modalButtons}>
+              <Button
+                title="Cancelar"
+                onPress={closeModal}
+                variant="outline"
+                style={styles.modalButton}
+              />
+              <Button
+                title="Agendar"
+                onPress={() => {
+                  // Aquí iría la lógica para agendar
+                  Alert.alert(
+                    'Asesoría agendada',
+                    `Asesoría con ${selectedProf} agendada para ${selectedDay} a las ${selectedHour}:00`
+                  );
+                  closeModal();
+                }}
+                variant="primary"
+                style={styles.modalButton}
+                disabled={!selectedDay || !selectedHour}
+              />
+            </View>
+          </Card>
         </View>
       </Modal>
-    </ScrollView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 20 },
-  tableContainer: {
-    borderWidth: 1,
-    borderColor: '#aaa',
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginTop: 20,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  row: { flexDirection: 'row' },
-  cell: {
+  container: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 8,
+    backgroundColor: UTEQColors.gray50,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: UTEQColors.white,
+  },
+  loadingText: {
+    marginTop: Spacing.md,
+    fontSize: FontSizes.base,
+    color: UTEQColors.textSecondary,
+  },
+  header: {
+    backgroundColor: UTEQColors.bluePrimary,
+    paddingTop: Spacing.xl + 20,
+    paddingBottom: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    borderBottomLeftRadius: BorderRadius['2xl'],
+    borderBottomRightRadius: BorderRadius['2xl'],
+  },
+  headerTitle: {
+    fontSize: FontSizes['2xl'],
+    fontWeight: '700',
+    color: UTEQColors.white,
+    marginBottom: Spacing.xs,
+  },
+  headerSubtitle: {
+    fontSize: FontSizes.sm,
+    color: UTEQColors.blueLightest,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: Spacing.md,
+    paddingBottom: Spacing.xl,
+  },
+  professorCard: {
+    marginBottom: Spacing.lg,
+  },
+  professorName: {
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
+    color: UTEQColors.bluePrimary,
+    marginBottom: Spacing.md,
+  },
+  scheduleButton: {
+    marginTop: Spacing.md,
+  },
+  emptyCard: {
+    padding: Spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 100,
   },
-  headerRow: { backgroundColor: '#4CAF50' },
-  headerCell: {
-    fontWeight: 'bold',
+  emptyText: {
+    fontSize: FontSizes.base,
+    color: UTEQColors.textSecondary,
     textAlign: 'center',
-    color: '#fff',
-    fontSize: 14,
-  },
-  hourCell: {
-    backgroundColor: '#32c725ff',
-    width: 60,
-    fontSize: 13,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  subjectCell: {
-    flex: 1,
-    minHeight: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 4,
-  },
-  subjText: { fontWeight: 'bold', textAlign: 'center', fontSize: 12 },
-  profText: { fontSize: 12, color: '#555', textAlign: 'center' },
-  roomText: { fontSize: 11, color: '#888', textAlign: 'center' },
-  emptyText: { color: '#ccc', fontSize: 12 },
-  picker: {
-    width: '100%',
-    marginVertical: 10,
-    backgroundColor: '#d1d1d1ff',
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '80%',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    alignItems: 'center',
+    width: '85%',
+    maxWidth: 400,
+    zIndex: 1,
   },
-  modalText: {
-    fontSize: 18,
-    marginBottom: 10,
+  modalTitle: {
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
+    color: UTEQColors.textPrimary,
+    marginBottom: Spacing.xs,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: FontSizes.sm,
+    color: UTEQColors.textSecondary,
+    marginBottom: Spacing.lg,
+    textAlign: 'center',
+  },
+  pickerContainer: {
+    marginBottom: Spacing.md,
+  },
+  pickerLabel: {
+    fontSize: FontSizes.sm,
+    fontWeight: '600',
+    color: UTEQColors.textPrimary,
+    marginBottom: Spacing.xs,
+  },
+  picker: {
+    height: 50,
+    borderRadius: BorderRadius.md,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: UTEQColors.gray300,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  modalButton: {
+    flex: 1,
   },
 });
