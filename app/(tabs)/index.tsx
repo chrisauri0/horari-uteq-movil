@@ -1,13 +1,117 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { HelloWave } from '@/components/hello-wave';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+
+
+
+
+const DAYS = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie'];
+const HOURS = [17, 18, 19, 20, 21];
+
+const ScheduleTable = ({ data }: { data: any[] }) => {
+  // Crear matriz vacía
+  const matrix: any = {};
+  HOURS.forEach((h) => {
+    matrix[h] = {};
+    DAYS.forEach((d) => (matrix[h][d] = null));
+  });
+
+  // Llenar la matriz con las materias
+  data.forEach((c) => {
+    const slot = c.start; // Ejemplo: "Lun18"
+    const dia = slot.slice(0, 3);
+    const hora = parseInt(slot.slice(3));
+    if (matrix[hora] && matrix[hora][dia] !== undefined) {
+      matrix[hora][dia] = c;
+    }
+  });
+
+  return (
+    <ThemedView style={styles.tableContainer}>
+      {/* Encabezado */}
+      <ThemedView style={[styles.row, styles.headerRow]}>
+        <ThemedText style={[styles.cell, styles.headerCell]}>Hora</ThemedText>
+        {DAYS.map((d) => (
+          <ThemedText key={d} style={[styles.cell, styles.headerCell]}>
+            {d}
+          </ThemedText>
+        ))}
+      </ThemedView>
+
+      {/* Filas */}
+      {HOURS.map((h) => (
+        <ThemedView key={h} style={styles.row}>
+          <ThemedText style={[styles.cell, styles.hourCell]}>
+            {h}:00
+          </ThemedText>
+          {DAYS.map((d) => {
+            const c = matrix[h][d];
+            return (
+              <ThemedView key={d} style={[styles.cell, styles.subjectCell]}>
+                {c ? (
+                  <>
+                    <ThemedText style={styles.subjText}>{c.subj}</ThemedText>
+                    <ThemedText style={styles.profText}>{c.prof}</ThemedText>
+                    <ThemedText style={styles.roomText}>{c.room}</ThemedText>
+                  </>
+                ) : (
+                  <ThemedText style={styles.emptyText}>–</ThemedText>
+                )}
+              </ThemedView>
+            );
+          })}
+        </ThemedView>
+      ))}
+    </ThemedView>
+  );
+};
+
 
 export default function HomeScreen() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [horarios, setHorarios] = useState<any[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<string>('');
+
+  useEffect(() => {
+    const fetchUserAndHorarios = async () => {
+      console.log('Fetching user from AsyncStorage...');
+      const storedUser = await AsyncStorage.getItem('user');
+      const storedHorarios = await AsyncStorage.getItem('horarios');
+
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+        console.log('User set in state:', JSON.parse(storedUser));
+      }
+
+      if (storedHorarios) {
+        setHorarios(JSON.parse(storedHorarios));
+        console.log('Horarios set in state:', JSON.parse(storedHorarios));
+      }
+
+      setLoading(false);
+      console.log('Loading state set to false');
+    };
+
+    fetchUserAndHorarios();
+  }, []);
+
+  if (loading) {
+    return (
+      <ThemedView style={styles.titleContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <ThemedText>Cargando...</ThemedText>
+      </ThemedView>
+    );
+  }
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -18,62 +122,36 @@ export default function HomeScreen() {
         />
       }>
       <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
+        <ThemedText type="title">Bienvenido, {user?.full_name || 'Invitado'}!</ThemedText>
         <HelloWave />
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
       <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
+        <ThemedText type="subtitle">Selecciona un grupo:</ThemedText>
+        <Picker
+          selectedValue={selectedGroup}
+          onValueChange={(itemValue: string) => setSelectedGroup(itemValue)}
+          style={{ color: '#000', backgroundColor: '#fff' }}>
+          {horarios.map((horario) => (
+            <Picker.Item key={horario.id} label={horario.nombregrupo} value={horario.id} />
+          ))}
+        </Picker>
       </ThemedView>
+
+      {selectedGroup && (
+        <ThemedView style={styles.stepContainer}>
+          <ThemedText type="subtitle">Datos del grupo seleccionado:</ThemedText>
+{selectedGroup && (
+  <ThemedView style={styles.stepContainer}>
+    <ThemedText type="subtitle">Horario del grupo seleccionado:</ThemedText>
+    <ScheduleTable
+      data={horarios.find((h) => h.id === selectedGroup)?.data || []}
+    />
+  </ThemedView>
+)}
+
+        </ThemedView>
+      )}
     </ParallaxScrollView>
   );
 }
@@ -95,4 +173,58 @@ const styles = StyleSheet.create({
     left: 0,
     position: 'absolute',
   },
+
+  tableContainer: {
+  borderWidth: 1,
+  borderColor: '#aaa',
+  borderRadius: 8,
+  overflow: 'hidden',
+  marginTop: 10,
+},
+row: {
+  flexDirection: 'row',
+},
+cell: {
+  flex: 1,
+  borderWidth: 1,
+  borderColor: '#ccc',
+  padding: 6,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+headerRow: {
+  backgroundColor: '#eee',
+},
+headerCell: {
+  fontWeight: 'bold',
+  textAlign: 'center',
+},
+hourCell: {
+  backgroundColor: '#f9f9f9',
+  width: 60,
+},
+subjectCell: {
+  flex: 1,
+  minHeight: 60,
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+subjText: {
+  fontWeight: 'bold',
+  textAlign: 'center',
+},
+profText: {
+  fontSize: 12,
+  color: '#555',
+  textAlign: 'center',
+},
+roomText: {
+  fontSize: 11,
+  color: '#888',
+  textAlign: 'center',
+},
+emptyText: {
+  color: '#ccc',
+},
+
 });
