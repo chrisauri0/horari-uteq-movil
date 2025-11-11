@@ -60,7 +60,7 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <ThemedText style={styles.welcomeText}>¡Bienvenido!</ThemedText>
-          <ThemedText style={styles.userName}>{user?.full_name || 'Invitado'}</ThemedText>
+          <ThemedText style={styles.userName}>{user?.full_name || user?.fullName || user?.email || 'Invitado'}</ThemedText>
         </View>
       </View>
 
