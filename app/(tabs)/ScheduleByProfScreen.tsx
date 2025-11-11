@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   professorName: {
     fontSize: FontSizes.xl,
     fontWeight: '700',
-    color: UTEQColors.bluePrimary,
+    color: UTEQColors.white,
     marginBottom: Spacing.md,
   },
   scheduleButton: {

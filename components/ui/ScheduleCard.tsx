@@ -35,13 +35,13 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
           {group}
         </Text>
       )}
-      <Text style={styles.subjectText} numberOfLines={2}>
+      <Text style={styles.subjectText} numberOfLines={1} ellipsizeMode="tail">
         {subject}
       </Text>
-      <Text style={styles.professorText} numberOfLines={1}>
+      <Text style={styles.professorText} numberOfLines={1} ellipsizeMode="tail">
         {professor}
       </Text>
-      <Text style={styles.roomText} numberOfLines={1}>
+      <Text style={styles.roomText} numberOfLines={1} ellipsizeMode="tail">
         {room}
       </Text>
     </View>
@@ -51,43 +51,56 @@ export const ScheduleCard: React.FC<ScheduleCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: UTEQColors.blueLightest,
-    borderRadius: BorderRadius.sm,
-    padding: Spacing.xs,
-    minHeight: 60,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    flex: 1, // Para ocupar todo el espacio disponible de la celda
+    width: '100%', // Redundante, pero asegúrate que Stretch funcione
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: UTEQColors.blueLighter,
+    minHeight: 70, // Opcional
+    maxHeight: 90, // Opcional
+    overflow: 'hidden', // <-- limita cualquier texto extra
   },
   emptyCell: {
-    minHeight: 60,
+    flex: 1,
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
   },
   groupText: {
     fontSize: FontSizes.xs,
     fontWeight: '700',
     color: UTEQColors.bluePrimary,
-    marginBottom: 2,
+    marginBottom: 1,
     textAlign: 'center',
+    flexShrink: 1,
   },
   subjectText: {
     fontSize: FontSizes.sm,
     fontWeight: '600',
     color: UTEQColors.textPrimary,
     textAlign: 'center',
-    marginBottom: 2,
+    marginBottom: 1,
+    flexShrink: 1,
   },
   professorText: {
     fontSize: FontSizes.xs,
     color: UTEQColors.textSecondary,
     textAlign: 'center',
-    marginBottom: 1,
+    flexShrink: 1,
   },
   roomText: {
     fontSize: FontSizes.xs - 1,
     color: UTEQColors.textTertiary,
     textAlign: 'center',
+    flexShrink: 1,
   },
   emptyText: {
     color: UTEQColors.gray300,

@@ -95,6 +95,8 @@ const styles = StyleSheet.create({
     backgroundColor: UTEQColors.white,
     ...Shadows.md,
     marginVertical: Spacing.md,
+    flex: 1, // Asegura el growth de la tabla
+    minWidth: '100%',
   },
   headerRow: {
     flexDirection: 'row',
@@ -104,6 +106,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: UTEQColors.gray200,
+    alignItems: 'stretch',
+    flexWrap: 'nowrap',   // Importante: línea única
+    minHeight: 90,
+    height: 90,
+    maxHeight: 90,
+    overflow: 'hidden',
   },
   headerCell: {
     flex: 1,
@@ -127,9 +135,14 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     minWidth: 100,
-    padding: 2,
+    height: '100%',
+    maxHeight: 90,
+    padding: 4,
     borderRightWidth: 1,
     borderRightColor: UTEQColors.gray200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
   hourCell: {
     minWidth: 60,

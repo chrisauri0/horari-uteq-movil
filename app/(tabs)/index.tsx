@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    color: UTEQColors.textPrimary,
+    color: UTEQColors.white,
     marginBottom: Spacing.md,
   },
   pickerContainer: {
