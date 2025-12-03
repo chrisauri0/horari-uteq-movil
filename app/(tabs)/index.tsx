@@ -1,18 +1,28 @@
+import { NOTIFY_CLASSES_TASK } from '@/background/notify-task';
+import { scheduleClassNotifications } from '@/utils/scheduleNotifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as Notifications from 'expo-notifications';
+
+
+
+
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, ScrollView, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ScheduleTable } from '@/components/ui';
-import { Card } from '@/components/ui';
-import { UTEQColors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { Card, ScheduleTable } from '@/components/ui';
+import api from '@/services/api';
+
+import { BorderRadius, Colors, FontSizes, Spacing, UTEQColors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Colors } from '@/constants/theme';
+import { useRouter } from "expo-router";
 
 
 export default function HomeScreen() {
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [horarios, setHorarios] = useState<any[]>([]);
@@ -20,20 +30,71 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const colors = Colors[colorScheme];
 
+
+useEffect(() => {
+  const registerBgTask = async () => {
+    await Notifications.requestPermissionsAsync();
+
+    try {
+      await BackgroundFetch.registerTaskAsync(NOTIFY_CLASSES_TASK, {
+        minimumInterval: 60 * 5, // cada 5 minutos revisa
+        stopOnTerminate: false,
+        startOnBoot: true,
+      });
+      console.log("Background task registered");
+    } catch (err) {
+      console.log("Error registering background task:", err);
+    }
+  };
+
+  registerBgTask();
+}, []);
+
+
+
+
   useEffect(() => {
     const fetchUserAndHorarios = async () => {
       console.log('Fetching user from AsyncStorage...');
       const storedUser = await AsyncStorage.getItem('user');
       const storedHorarios = await AsyncStorage.getItem('horarios');
+      const storedProfesores = await AsyncStorage.getItem('profesores');
 
       if (storedUser) {
         setUser(JSON.parse(storedUser));
         console.log('User set in state:', JSON.parse(storedUser));
       }
+      else {
+        console.log('No user found in AsyncStorage.');
+        router.push('/login-register');
+      }
 
-      if (storedHorarios) {
-        setHorarios(JSON.parse(storedHorarios));
-        console.log('Horarios set in state:', JSON.parse(storedHorarios));
+     if (storedHorarios) {
+  const parsed = JSON.parse(storedHorarios);
+  setHorarios(parsed);
+
+  // ⬅️ PROGRAMAR NOTIFICACIONES
+  await scheduleClassNotifications(parsed);
+
+} else {
+  const schedulesRes = await api.get('/scheduler/allschedules');
+  await AsyncStorage.setItem('horarios', JSON.stringify(schedulesRes.data.schedules));
+
+  const parsed = schedulesRes.data.schedules;
+  setHorarios(parsed);
+
+  // ⬅️ PROGRAMAR NOTIFICACIONES
+  await scheduleClassNotifications(parsed);
+}
+
+      if (storedProfesores) {
+        console.log('Profesores found in AsyncStorage.');
+        console.log(JSON.parse(storedProfesores));
+      }else {
+        console.log('No profesores found in AsyncStorage.');
+        const profesoresRes = await api.get('/profesores/movil');
+        await AsyncStorage.setItem('profesores', JSON.stringify(profesoresRes.data));
+        console.log('Profesores fetched from API and stored in AsyncStorage.');
       }
 
       setLoading(false);
@@ -56,11 +117,16 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Header con color azul */}
+      {/* Header con diseño mejorado */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <ThemedText style={styles.welcomeText}>¡Bienvenido!</ThemedText>
-          <ThemedText style={styles.userName}>{user?.full_name || user?.fullName || user?.email || 'Invitado'}</ThemedText>
+          <View>
+            <ThemedText style={styles.welcomeLabel}>Bienvenido,</ThemedText>
+            <ThemedText style={styles.userName} numberOfLines={1}>
+              {user?.full_name || user?.fullName || user?.email || 'Estudiante'}
+            </ThemedText>
+          </View>
+          {/* Aquí podrías agregar un avatar o icono de perfil si lo tuvieras */}
         </View>
       </View>
 
@@ -68,47 +134,60 @@ export default function HomeScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        
+
         {/* Card de selección de grupo */}
-        <Card variant="elevated" style={styles.card}>
-          <ThemedText style={styles.cardTitle}>Selecciona un grupo</ThemedText>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedGroup}
-              onValueChange={(itemValue: string) => setSelectedGroup(itemValue)}
-              style={[
-                styles.picker,
-                { color: colors.text, backgroundColor: colors.background }
-              ]}
-              dropdownIconColor={UTEQColors.bluePrimary}>
-              <Picker.Item label="Seleccione un grupo" value="" />
-              {horarios.map((horario) => (
-                <Picker.Item
-                  key={horario.id}
-                  label={horario.nombregrupo}
-                  value={horario.id}
-                />
-              ))}
-            </Picker>
-          </View>
-        </Card>
+        <View style={styles.sectionContainer}>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>Tu Grupo</ThemedText>
+          <Card variant="elevated" style={styles.pickerCard}>
+            <View style={styles.pickerWrapper}>
+              <Picker
+                selectedValue={selectedGroup}
+                onValueChange={(itemValue: string) => setSelectedGroup(itemValue)}
+                style={[
+                  styles.picker,
+                  { color: UTEQColors.textPrimary }
+                ]}
+                dropdownIconColor={UTEQColors.bluePrimary}>
+                <Picker.Item label="Selecciona un grupo..." value="" color={UTEQColors.textSecondary} />
+                {horarios.map((horario) => (
+                  <Picker.Item
+                    key={horario.id}
+                    label={horario.nombregrupo}
+                    value={horario.id}
+                    color={UTEQColors.textPrimary}
+                  />
+                ))}
+              </Picker>
+            </View>
+          </Card>
+        </View>
 
         {/* Horario del grupo seleccionado */}
-        {selectedGroup && selectedHorario && (
-          <Card variant="elevated" style={styles.scheduleCard}>
-            <ThemedText style={styles.cardTitle}>
-              Horario - {selectedHorario.nombregrupo}
-            </ThemedText>
-            <ScheduleTable data={selectedHorario.data || []} />
-          </Card>
-        )}
-
-        {!selectedGroup && (
-          <Card variant="outlined" style={styles.emptyCard}>
-            <ThemedText style={styles.emptyText}>
-              Selecciona un grupo para ver su horario
-            </ThemedText>
-          </Card>
+        {selectedGroup && selectedHorario ? (
+          <View style={styles.sectionContainer}>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>Horario de Clases</ThemedText>
+            <Card variant="elevated" style={styles.scheduleCard}>
+              <View style={styles.scheduleHeader}>
+                <ThemedText style={styles.scheduleTitle}>
+                  {selectedHorario.nombregrupo}
+                </ThemedText>
+                <View style={styles.badge}>
+                  <ThemedText style={styles.badgeText}>Activo</ThemedText>
+                </View>
+              </View>
+              <ScheduleTable data={selectedHorario.data || []} />
+            </Card>
+          </View>
+        ) : (
+          !selectedGroup && (
+            <View style={styles.emptyStateContainer}>
+              <Card variant="outlined" style={styles.emptyCard}>
+                <ThemedText style={styles.emptyText}>
+                  👈 Selecciona un grupo arriba para visualizar tu horario de clases.
+                </ThemedText>
+              </Card>
+            </View>
+          )
         )}
       </ScrollView>
     </ThemedView>
@@ -132,64 +211,118 @@ const styles = StyleSheet.create({
     color: UTEQColors.textSecondary,
   },
   header: {
-    paddingTop: Spacing.xl + 20,
-    paddingBottom: Spacing.xl,
-    paddingHorizontal: Spacing.lg,
-    borderBottomLeftRadius: BorderRadius['2xl'],
-    borderBottomRightRadius: BorderRadius['2xl'],
     backgroundColor: UTEQColors.bluePrimary,
+    paddingTop: Spacing.xl + 24, // Status bar padding
+    paddingBottom: Spacing.xl + 10,
+    paddingHorizontal: Spacing.lg,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 10,
   },
   headerContent: {
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  welcomeText: {
-    fontSize: FontSizes.xl,
-    color: UTEQColors.white,
-    marginBottom: Spacing.xs,
-    fontWeight: '600',
+  welcomeLabel: {
+    fontSize: FontSizes.sm,
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginBottom: 4,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   userName: {
-    fontSize: FontSizes['2xl'],
+    fontSize: 26,
     color: UTEQColors.white,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   scrollView: {
     flex: 1,
+    marginTop: -20, // Pull up content to overlap header slightly if desired, or just 0
   },
   scrollContent: {
-    padding: Spacing.md,
+    padding: Spacing.lg,
+    paddingTop: Spacing.xl,
     paddingBottom: Spacing.xl,
   },
-  card: {
-    marginBottom: Spacing.md,
+  sectionContainer: {
+    marginBottom: Spacing.xl,
   },
-  cardTitle: {
+  sectionTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
-    color: UTEQColors.white,
-    marginBottom: Spacing.md,
+    color: UTEQColors.textPrimary,
+    marginBottom: Spacing.sm,
+    marginLeft: Spacing.xs,
   },
-  pickerContainer: {
-    borderRadius: BorderRadius.md,
+  pickerCard: {
+    padding: 0, // Remove default padding to let picker fill
+    borderRadius: BorderRadius.lg,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: UTEQColors.gray300,
+    backgroundColor: UTEQColors.white,
+  },
+  pickerWrapper: {
+    paddingHorizontal: Spacing.xs,
   },
   picker: {
-    height: 50,
+    height: 56,
   },
   scheduleCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: UTEQColors.white,
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: Spacing.md,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: UTEQColors.gray200,
+  },
+  scheduleTitle: {
+    fontSize: FontSizes.xl,
+    fontWeight: '700',
+    color: UTEQColors.bluePrimary,
+  },
+  badge: {
+    backgroundColor: UTEQColors.blueLight,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: FontSizes.xs,
+    color: UTEQColors.bluePrimary,
+    fontWeight: '700',
+  },
+  emptyStateContainer: {
+    marginTop: Spacing.xl,
   },
   emptyCard: {
     padding: Spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 100,
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: UTEQColors.gray300,
+    borderStyle: 'dashed',
   },
   emptyText: {
     fontSize: FontSizes.base,
     color: UTEQColors.textSecondary,
     textAlign: 'center',
+    lineHeight: 24,
   },
 });

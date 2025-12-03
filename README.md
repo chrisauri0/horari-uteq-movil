@@ -1,50 +1,88 @@
-# Welcome to your Expo app 👋
+# Horari-UTEQ
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Aplicación móvil para consultar y agendar horarios de clases y asesorías en la UTEQ.
 
-## Get started
+## Requisitos
 
-1. Install dependencies
+- Node.js >= 18
+- pnpm (o npm/yarn)
+- Expo CLI (`npm install -g expo-cli`)
+- Android Studio o dispositivo físico (para pruebas)
+- Acceso a la API backend (configura la URL en `.env`)
 
-   ```bash
+## Instalación
+
+1. Clona el repositorio:
+
+   ```sh
+   git clone https://github.com/chrisauri0/horari-uteq-movil.git
+   cd horari-uteq-movil/Horari-UTEQ
+   ```
+
+2. Instala dependencias:
+
+   ```sh
+   pnpm install
+   # o
    npm install
+   # o
+   yarn install
    ```
 
-2. Start the app
+3. Configura variables de entorno:
 
-   ```bash
-   npx expo start
+   - Crea un archivo `.env` en la raíz con:
+     ```env
+     API_BASE_URL=https://tu-api.com
+     ```
+   - Cambia la URL por la de tu backend.
+
+4. Inicia el proyecto en modo desarrollo:
+   ```sh
+   expo start
    ```
+   - Escanea el QR con Expo Go o abre en emulador Android/iOS.
 
-In the output, you'll find options to open the app in a
+## Compilación para producción
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Requiere cuenta en Expo y EAS CLI:
+  ```sh
+  npm install -g eas-cli
+  eas build -p android --profile preview
+  eas build -p ios --profile preview
+  ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Google Auth
 
-## Get a fresh project
+- Configura los clientId en Google Cloud Console para Android/iOS/Web.
+- Agrega el scheme en `app.json`:
+  ```json
+  "scheme": "com.chrisauri0.horariuteq"
+  ```
+- Revisa la documentación de Expo AuthSession si tienes problemas de login.
 
-When you're ready, run:
+## Estructura principal
 
-```bash
-npm run reset-project
-```
+- `app/` — Pantallas y rutas Expo Router
+- `components/` — Componentes reutilizables
+- `constants/` — Temas y configuración
+- `hooks/` — Custom hooks
+- `services/` — API y utilidades
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Notas
 
-## Learn more
+- El backend debe estar disponible y configurado en `.env`.
+- Si tienes problemas de dependencias, revisa las versiones sugeridas por Expo en la consola.
+- Para Google Auth, revisa los redirect URI y el scheme.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Contribuir
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Haz un fork y crea una rama:
+   ```sh
+   git checkout -b feature/nueva-funcionalidad
+   ```
+2. Haz tus cambios y abre un Pull Request.
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+¿Dudas o problemas? Abre un issue en GitHub o contacta al owner del repo.
