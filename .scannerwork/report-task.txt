@@ -1,0 +1,6 @@
+projectKey=movil-uteq
+serverUrl=http://localhost:9000
+serverVersion=26.1.0.118079
+dashboardUrl=http://localhost:9000/dashboard?id=movil-uteq
+ceTaskId=311b81ea-cd95-43df-913e-b55b630a919d
+ceTaskUrl=http://localhost:9000/api/ce/task?id=311b81ea-cd95-43df-913e-b55b630a919d

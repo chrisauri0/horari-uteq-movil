@@ -1,104 +1,106 @@
-import { NOTIFY_CLASSES_TASK } from '@/background/notify-task';
-import { scheduleClassNotifications } from '@/utils/scheduleNotifications';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
-import * as BackgroundFetch from 'expo-background-fetch';
-import * as Notifications from 'expo-notifications';
+import { NOTIFY_CLASSES_TASK } from "@/background/notify-task";
+import { scheduleClassNotifications } from "@/utils/scheduleNotifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Picker } from "@react-native-picker/picker";
+import * as BackgroundFetch from "expo-background-fetch";
+import * as Notifications from "expo-notifications";
 
+import { useEffect, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
 
+import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
+import { Card, ScheduleTable } from "@/components/ui";
+import api from "@/services/api";
 
-
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Card, ScheduleTable } from '@/components/ui';
-import api from '@/services/api';
-
-import { BorderRadius, Colors, FontSizes, Spacing, UTEQColors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import {
+  BorderRadius,
+  Colors,
+  FontSizes,
+  Spacing,
+  UTEQColors,
+} from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
-
 
 export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [horarios, setHorarios] = useState<any[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<string>('');
-  const colorScheme = useColorScheme() ?? 'light';
+  const [selectedGroup, setSelectedGroup] = useState<string>("");
+  const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
 
+  useEffect(() => {
+    const registerBgTask = async () => {
+      await Notifications.requestPermissionsAsync();
 
-useEffect(() => {
-  const registerBgTask = async () => {
-    await Notifications.requestPermissionsAsync();
+      try {
+        await BackgroundFetch.registerTaskAsync(NOTIFY_CLASSES_TASK, {
+          minimumInterval: 60 * 5, // cada 5 minutos revisa
+          stopOnTerminate: false,
+          startOnBoot: true,
+        });
+        console.log("Background task registered");
+      } catch (err) {
+        console.log("Error registering background task:", err);
+      }
+    };
 
-    try {
-      await BackgroundFetch.registerTaskAsync(NOTIFY_CLASSES_TASK, {
-        minimumInterval: 60 * 5, // cada 5 minutos revisa
-        stopOnTerminate: false,
-        startOnBoot: true,
-      });
-      console.log("Background task registered");
-    } catch (err) {
-      console.log("Error registering background task:", err);
-    }
-  };
-
-  registerBgTask();
-}, []);
-
-
-
+    registerBgTask();
+  }, []);
 
   useEffect(() => {
     const fetchUserAndHorarios = async () => {
-      console.log('Fetching user from AsyncStorage...');
-      const storedUser = await AsyncStorage.getItem('user');
-      const storedHorarios = await AsyncStorage.getItem('horarios');
-      const storedProfesores = await AsyncStorage.getItem('profesores');
+      console.log("Fetching user from AsyncStorage...");
+      const storedUser = await AsyncStorage.getItem("user");
+      const storedHorarios = await AsyncStorage.getItem("horarios");
+      const storedProfesores = await AsyncStorage.getItem("profesores");
 
       if (storedUser) {
         setUser(JSON.parse(storedUser));
-        console.log('User set in state:', JSON.parse(storedUser));
+        console.log("User set in state:", JSON.parse(storedUser));
+      } else {
+        console.log("No user found in AsyncStorage.");
+        router.push("/login-register");
       }
-      else {
-        console.log('No user found in AsyncStorage.');
-        router.push('/login-register');
+
+      if (storedHorarios) {
+        const parsed = JSON.parse(storedHorarios);
+        setHorarios(parsed);
+
+        // ⬅️ PROGRAMAR NOTIFICACIONES
+        await scheduleClassNotifications(parsed);
+      } else {
+        const schedulesRes = await api.get("/scheduler/allschedules");
+        await AsyncStorage.setItem(
+          "horarios",
+          JSON.stringify(schedulesRes.data.schedules),
+        );
+
+        const parsed = schedulesRes.data.schedules;
+        setHorarios(parsed);
+
+        // ⬅️ PROGRAMAR NOTIFICACIONES
+        await scheduleClassNotifications(parsed);
       }
-
-     if (storedHorarios) {
-  const parsed = JSON.parse(storedHorarios);
-  setHorarios(parsed);
-
-  // ⬅️ PROGRAMAR NOTIFICACIONES
-  await scheduleClassNotifications(parsed);
-
-} else {
-  const schedulesRes = await api.get('/scheduler/allschedules');
-  await AsyncStorage.setItem('horarios', JSON.stringify(schedulesRes.data.schedules));
-
-  const parsed = schedulesRes.data.schedules;
-  setHorarios(parsed);
-
-  // ⬅️ PROGRAMAR NOTIFICACIONES
-  await scheduleClassNotifications(parsed);
-}
 
       if (storedProfesores) {
-        console.log('Profesores found in AsyncStorage.');
+        console.log("Profesores found in AsyncStorage.");
         console.log(JSON.parse(storedProfesores));
-      }else {
-        console.log('No profesores found in AsyncStorage.');
-        const profesoresRes = await api.get('/profesores/movil');
-        await AsyncStorage.setItem('profesores', JSON.stringify(profesoresRes.data));
-        console.log('Profesores fetched from API and stored in AsyncStorage.');
+      } else {
+        console.log("No profesores found in AsyncStorage.");
+        const profesoresRes = await api.get("/profesores/movil");
+        await AsyncStorage.setItem(
+          "profesores",
+          JSON.stringify(profesoresRes.data),
+        );
+        console.log("Profesores fetched from API and stored in AsyncStorage.");
       }
 
       setLoading(false);
-      console.log('Loading state set to false');
+      console.log("Loading state set to false");
     };
 
     fetchUserAndHorarios();
@@ -123,32 +125,37 @@ useEffect(() => {
           <View>
             <ThemedText style={styles.welcomeLabel}>Bienvenido,</ThemedText>
             <ThemedText style={styles.userName} numberOfLines={1}>
-              {user?.full_name || user?.fullName || user?.email || 'Estudiante'}
+              {user?.full_name || user?.fullName || user?.email || "Estudiante"}
             </ThemedText>
           </View>
-          {/* Aquí podrías agregar un avatar o icono de perfil si lo tuvieras */}
         </View>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
-
+        showsVerticalScrollIndicator={false}
+      >
         {/* Card de selección de grupo */}
         <View style={styles.sectionContainer}>
-          <ThemedText type="subtitle" style={styles.sectionTitle}>Tu Grupo</ThemedText>
+          <ThemedText type="subtitle" style={styles.sectionTitle}>
+            Tu Grupo
+          </ThemedText>
           <Card variant="elevated" style={styles.pickerCard}>
             <View style={styles.pickerWrapper}>
               <Picker
                 selectedValue={selectedGroup}
-                onValueChange={(itemValue: string) => setSelectedGroup(itemValue)}
-                style={[
-                  styles.picker,
-                  { color: UTEQColors.textPrimary }
-                ]}
-                dropdownIconColor={UTEQColors.bluePrimary}>
-                <Picker.Item label="Selecciona un grupo..." value="" color={UTEQColors.textSecondary} />
+                onValueChange={(itemValue: string) =>
+                  setSelectedGroup(itemValue)
+                }
+                style={[styles.picker, { color: UTEQColors.textPrimary }]}
+                dropdownIconColor={UTEQColors.bluePrimary}
+              >
+                <Picker.Item
+                  label="Selecciona un grupo..."
+                  value=""
+                  color={UTEQColors.textSecondary}
+                />
                 {horarios.map((horario) => (
                   <Picker.Item
                     key={horario.id}
@@ -165,7 +172,9 @@ useEffect(() => {
         {/* Horario del grupo seleccionado */}
         {selectedGroup && selectedHorario ? (
           <View style={styles.sectionContainer}>
-            <ThemedText type="subtitle" style={styles.sectionTitle}>Horario de Clases</ThemedText>
+            <ThemedText type="subtitle" style={styles.sectionTitle}>
+              Horario de Clases
+            </ThemedText>
             <Card variant="elevated" style={styles.scheduleCard}>
               <View style={styles.scheduleHeader}>
                 <ThemedText style={styles.scheduleTitle}>
@@ -183,7 +192,8 @@ useEffect(() => {
             <View style={styles.emptyStateContainer}>
               <Card variant="outlined" style={styles.emptyCard}>
                 <ThemedText style={styles.emptyText}>
-                  👈 Selecciona un grupo arriba para visualizar tu horario de clases.
+                  👈 Selecciona un grupo arriba para visualizar tu horario de
+                  clases.
                 </ThemedText>
               </Card>
             </View>
@@ -201,8 +211,8 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: UTEQColors.white,
   },
   loadingText: {
@@ -228,22 +238,22 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   welcomeLabel: {
     fontSize: FontSizes.sm,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: "rgba(255, 255, 255, 0.9)",
     marginBottom: 4,
-    fontWeight: '500',
-    textTransform: 'uppercase',
+    fontWeight: "500",
+    textTransform: "uppercase",
     letterSpacing: 1,
   },
   userName: {
     fontSize: 26,
     color: UTEQColors.white,
-    fontWeight: '800',
+    fontWeight: "800",
     letterSpacing: -0.5,
   },
   scrollView: {
@@ -260,7 +270,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: FontSizes.lg,
-    fontWeight: '700',
+    fontWeight: "700",
     color: UTEQColors.textPrimary,
     marginBottom: Spacing.sm,
     marginLeft: Spacing.xs,
@@ -268,7 +278,7 @@ const styles = StyleSheet.create({
   pickerCard: {
     padding: 0, // Remove default padding to let picker fill
     borderRadius: BorderRadius.lg,
-    overflow: 'hidden',
+    overflow: "hidden",
     backgroundColor: UTEQColors.white,
   },
   pickerWrapper: {
@@ -283,9 +293,9 @@ const styles = StyleSheet.create({
     backgroundColor: UTEQColors.white,
   },
   scheduleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: Spacing.md,
     paddingBottom: Spacing.sm,
     borderBottomWidth: 1,
@@ -293,7 +303,7 @@ const styles = StyleSheet.create({
   },
   scheduleTitle: {
     fontSize: FontSizes.xl,
-    fontWeight: '700',
+    fontWeight: "700",
     color: UTEQColors.bluePrimary,
   },
   badge: {
@@ -305,24 +315,24 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: FontSizes.xs,
     color: UTEQColors.bluePrimary,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   emptyStateContainer: {
     marginTop: Spacing.xl,
   },
   emptyCard: {
     padding: Spacing.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent",
     borderWidth: 2,
     borderColor: UTEQColors.gray300,
-    borderStyle: 'dashed',
+    borderStyle: "dashed",
   },
   emptyText: {
     fontSize: FontSizes.base,
     color: UTEQColors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 24,
   },
 });
