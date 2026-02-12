@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'https://horarios-backend-58w8.onrender.com';
+const API_BASE_URL = process.env.API_BASE_URL || 'http://[IP_ADDRESS]:3000';
 
 // Crear instancia de axios
 const api: AxiosInstance = axios.create({
