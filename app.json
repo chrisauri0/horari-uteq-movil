@@ -68,7 +68,8 @@
       "router": {},
       "eas": {
         "projectId": "9547f1e3-630e-454b-b827-1076b9b8cf4e"
-      }
+      },
+      "apiBaseUrl": "http://192.168.1.74:3000"
     }
     
   }

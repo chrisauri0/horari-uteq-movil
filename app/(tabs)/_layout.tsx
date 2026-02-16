@@ -46,8 +46,20 @@ export default function TabLayout() {
       <Tabs.Screen
         name="posts"
         options={{
-          title: 'Anuncios',
+          title: 'Comunidad',
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell.fill" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="posts/create"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="posts/[id]"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
+import Constants from 'expo-constants';
 
-const API_BASE_URL = process.env.API_BASE_URL || 'http://[IP_ADDRESS]:3000';
+const API_BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl || 'http://192.168.1.74:3000';
 
 // Crear instancia de axios
 const api: AxiosInstance = axios.create({

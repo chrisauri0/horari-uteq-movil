@@ -3,69 +3,54 @@ import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui";
 import api from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Google from "expo-auth-session/providers/google";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useState } from "react";
 
-import { ActivityIndicator, Alert, Image, Platform, StyleSheet, View } from "react-native";
-
-WebBrowser.maybeCompleteAuthSession();
+import { ActivityIndicator, Alert, Image, StyleSheet, TextInput, View } from "react-native";
 
 export default function LoginScreen() {
   const [user, setUser] = useState<any>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: Platform.select({
-      native: Platform.OS === "ios" ? "431935309556-d49s155tlbt0hkjdln3jgdva3aqdfm60.apps.googleusercontent.com" : "431935309556-6034554jmim4opcamkr4gpqsu0tvkjhh.apps.googleusercontent.com",
-      web: "431935309556-nphlheucqg6qejceusr6obu7uch8v8bv.apps.googleusercontent.com",
-    }),
-    scopes: [
-      "openid",
-      "email",
-      "profile",
-      "https://www.googleapis.com/auth/calendar",
-    ],
-    extraParams: { hd: "uteq.edu.mx" }, // 🔐 SOLO UTEQ
-
-  },
-
-  );
-
-useEffect(() => {
   const handleLogin = async () => {
-    if (response?.type === "success") {
-      const authentication = response.authentication;
-
-      // Verificar que authentication y accessToken existan
-      if (!authentication?.accessToken) {
-        console.warn("No authentication/accessToken returned from Google auth response.");
-        Alert.alert("Error", "No se recibió un token de acceso válido.");
-        return;
-      }
-
-      // Guardar accessToken
-      await AsyncStorage.setItem("googleAccessToken", authentication.accessToken);
-
-      // Obtener info del usuario
-      fetchUserInfo(authentication.accessToken);
+    if (!email || !password) {
+      Alert.alert("Error", "Por favor completa email y contraseña");
+      return;
     }
-  };
 
-  handleLogin();
-}, [response]);
-
-  const fetchUserInfo = async (accessToken?: string) => {
+    setLoading(true);
     try {
-      const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: { Authorization: `Bearer ${accessToken}` },
+      const response = await api.post('/auth/login', {
+        email,
+        password
       });
 
-      const user = await res.json();
-      console.log("User Google:", user);
-      setUser(user);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
+      const { access_token, token, user: backendUser } = response.data;
+      const authToken = access_token || token;
+
+      if (authToken) {
+        await AsyncStorage.setItem('access_token', authToken);
+      }
+
+      let userRecord: any = null;
+      try {
+        const userRes = await api.get(`/users/email/${email}`);
+        userRecord = userRes.data;
+      } catch (userError) {
+        console.log('Error fetching user record:', userError);
+      }
+
+      const userData = {
+        id: userRecord?.id,
+        email: userRecord?.email || email,
+        name: backendUser?.nombre || userRecord?.full_name || email,
+        role: userRecord?.role || backendUser?.role || 'estudiante',
+      };
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
 
       try {
         const schedulesRes = await api.get('/scheduler/allschedules');
@@ -74,44 +59,23 @@ useEffect(() => {
         console.log("Error fetching schedules:", err);
       }
 
-      
       try {
         const profesoresRes = await api.get('/profesores/movil');
         await AsyncStorage.setItem('profesores', JSON.stringify(profesoresRes.data.profesores));
       } catch (err) {
-        console.log("Error fetching profesores :", err);
+        console.log("Error fetching profesores:", err);
       }
 
+      Alert.alert("¡Éxito!", `Bienvenido ${userData.email}`);
+      router.push("/");
 
-      if (!user.email.endsWith("@uteq.edu.mx")) {
-        Alert.alert("Error", "Debes usar un correo @uteq.edu.mx válido.");
-        return;
-      }
-
-
-
-      Alert.alert("Bienvenido", `${user.name}`);
-
-      // Guardar en tu global state, context, etc (si aplica)
-
-      router.push("/"); // 🚀 Ir a Home
-
-    } catch (err) {
-      console.log(err);
-      Alert.alert("Error", "No se pudo iniciar sesión.");
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Email o contraseña incorrectos';
+      Alert.alert("Error de login", errorMsg);
+      console.error("Login error:", error);
+    } finally {
+      setLoading(false);
     }
-  };
-  const bypass = async () => {
-    // Usuario de prueba
-    
-      try {
-        const schedulesRes = await api.get('/scheduler/allschedules');
-        await AsyncStorage.setItem('horarios', JSON.stringify(schedulesRes.data.schedules));
-      } catch (err) {
-        console.log("Error fetching schedules:", err);
-      }
-    
-    router.push("/"); // 🚀 Ir a Home
   };
 
   return (
@@ -134,26 +98,40 @@ useEffect(() => {
         </ThemedText>
 
         <View style={styles.buttonContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            editable={!loading}
+            placeholderTextColor="#999"
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+
+          <TextInput
+            style={styles.input}
+            placeholder="Contraseña"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            editable={!loading}
+            placeholderTextColor="#999"
+            autoCapitalize="none"
+          />
+
           <Button
-            title="Continuar con Google"
-            onPress={() => promptAsync()}
+            title={loading ? "Iniciando..." : "Iniciar Sesión"}
+            onPress={handleLogin}
             variant="primary"
             size="large"
             fullWidth
             style={styles.googleButton}
+            disabled={loading}
           />
-          {/* <Button
-            title="Continuar con bypass"
-            onPress={() => bypass()}
-            variant="primary"
-            size="large"
-            fullWidth
-            style={styles.bypassButton}
-          /> */}
-
         </View>
 
-        {!request && (
+        {loading && (
           <ActivityIndicator size="large" style={styles.loader} />
         )}
       </View>
@@ -198,6 +176,15 @@ const styles = StyleSheet.create({
   buttonContainer: {
     width: "100%",
     maxWidth: 320,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 12,
+    marginBottom: 12,
+    borderRadius: 8,
+    color: '#000',
+    backgroundColor: '#fff',
   },
   googleButton: {
     marginBottom: 20,
