@@ -63,7 +63,7 @@ export default function HomeScreen() {
         console.log("User set in state:", JSON.parse(storedUser));
       } else {
         console.log("No user found in AsyncStorage.");
-        router.push("/login-register");
+        // router.push("/login-register");
       }
 
       if (storedHorarios) {

@@ -1,10 +1,10 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
+import { Tabs } from "expo-router";
+import React from "react";
 
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { HapticTab } from "@/components/haptic-tab";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { Colors } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -12,13 +12,13 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarInactiveTintColor: Colors[colorScheme ?? "light"].tabIconDefault,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          backgroundColor: Colors[colorScheme ?? 'light'].background,
-          borderTopColor: Colors[colorScheme ?? 'light'].border,
+          backgroundColor: Colors[colorScheme ?? "light"].background,
+          borderTopColor: Colors[colorScheme ?? "light"].border,
           borderTopWidth: 1,
           height: 60,
           paddingBottom: 8,
@@ -26,21 +26,45 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: "600",
         },
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Horarios',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="calendar.fill" color={color} />,
+          title: "Horarios",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={24} name="calendar.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="BlogScreen"
+        options={{
+          title: "Blog",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={24} name="newspaper.fill" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="ScheduleByProfScreen"
         options={{
-          title: 'Profesores',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.2.fill" color={color} />,
+          title: "Profesores",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={24} name="person.2.fill" color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="PsicologosScreen"
+        options={{
+          title: "Psicólogos",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={24} name="person.wave.2.fill" color={color} />
+          ),
         }}
       />
     </Tabs>
