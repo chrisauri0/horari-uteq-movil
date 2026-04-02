@@ -67,6 +67,13 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="posts"
+        options={{
+          title: 'Anuncios',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell.fill" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

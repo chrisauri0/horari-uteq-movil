@@ -8,10 +8,14 @@
       "distribution": "internal"
     },
     "production": {
+      "ios": {},
+      "android": {}
+    },
+    "production-simulator": {
+      "extends": "production",
       "ios": {
         "simulator": true
-      },
-      "android": {}
+      }
     }
   }
 }

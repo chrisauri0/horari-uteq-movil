@@ -9,42 +9,39 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.chrisauri0.horariuteq",
+      "buildNumber": "1.0.0",
       "supportsTablet": true
     },
     "android": {
-  "package": "com.chrisauri0.horariuteq",
+      "package": "com.chrisauri0.horariuteq",
       "permissions": ["RECEIVE_BOOT_COMPLETED"],
       "notification": {
         "icon": "./assets/images/logo-notificacion.png",
         "color": "#0050b5"
       },
-    
-  "adaptiveIcon": {
-    "backgroundColor": "#E6F4FE",
-    "foregroundImage": "./assets/images/android-icon-foreground.png",
-    "backgroundImage": "./assets/images/android-icon-background.png",
-    "monochromeImage": "./assets/images/android-icon-monochrome.png"
-  },
-  "edgeToEdgeEnabled": true,
-  "predictiveBackGestureEnabled": false
-}
-    ,
+
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-
-       [
+      [
         "expo-notifications",
         {
           "icon": "./assets/images/logo-notificacion.png",
           "color": "#0050b5"
         }
       ],
-
-      
-
 
       "expo-router",
       [
@@ -70,6 +67,5 @@
         "projectId": "9547f1e3-630e-454b-b827-1076b9b8cf4e"
       }
     }
-    
   }
 }
