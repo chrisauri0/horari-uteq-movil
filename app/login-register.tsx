@@ -14,6 +14,7 @@ import {
   Alert,
   Image,
   Platform,
+  Pressable,
   StyleSheet,
   View,
 } from "react-native";
@@ -129,16 +130,31 @@ export default function LoginScreen() {
     }
   };
   const bypass = async () => {
-    // Usuario de prueba
+    // Usuario de prueba local para entrar sin Google
+    const localUser = {
+      id: "bypass-local",
+      email: "local@uteq.edu.mx",
+      full_name: "Usuario Bypass",
+      fullName: "Usuario Bypass",
+      name: "Usuario Bypass",
+    };
 
+    console.log("[BYPASS] Iniciando bypass local...");
+    await AsyncStorage.setItem("user", JSON.stringify(localUser));
+
+    // Navega primero para no depender de red local
+    router.replace("/");
+
+    // Precarga en background sin bloquear navegación
     try {
       const schedulesRes = await api.get("/scheduler/allschedules");
       await AsyncStorage.setItem(
         "horarios",
-        JSON.stringify(schedulesRes.data.schedules),
+        JSON.stringify(schedulesRes.data.schedules ?? []),
       );
+      console.log("[BYPASS] Horarios precargados");
     } catch (err) {
-      console.log("Error fetching schedules:", err);
+      console.log("[BYPASS] Error fetching schedules:", err);
     }
 
     try {
@@ -147,13 +163,10 @@ export default function LoginScreen() {
         ? psicologosRes.data
         : (psicologosRes.data?.psicologos ?? []);
       await AsyncStorage.setItem("psicologos", JSON.stringify(psicologosData));
-      console.log("Psicologos fetched and stored successfully.");
-      console.log("Psicologos data:", psicologosData);
+      console.log("[BYPASS] Psicologos precargados");
     } catch (err) {
-      console.log("Error fetching psicologos:", err);
+      console.log("[BYPASS] Error fetching psicologos:", err);
     }
-
-    router.push("/"); // 🚀 Ir a Home
   };
 
   return (
@@ -193,6 +206,12 @@ export default function LoginScreen() {
             fullWidth
             style={styles.bypassButton}
           />
+
+          <Pressable onPress={bypass} style={styles.bypassFallbackArea}>
+            <ThemedText style={styles.bypassFallbackText}>
+              Si no responde, toca aqui para entrar con bypass
+            </ThemedText>
+          </Pressable>
         </View>
 
         {!request && <ActivityIndicator size="large" style={styles.loader} />}
@@ -209,6 +228,16 @@ const styles = StyleSheet.create({
   },
   bypassButton: {
     marginTop: 20,
+  },
+  bypassFallbackArea: {
+    marginTop: 10,
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  bypassFallbackText: {
+    fontSize: 13,
+    opacity: 0.85,
+    textDecorationLine: "underline",
   },
   logoContainer: {
     alignItems: "center",

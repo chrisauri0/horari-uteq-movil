@@ -1,9 +1,9 @@
-import { View, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { ThemedText } from '@/components/themed-text';
-import { Card } from '@/components/ui';
-import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { IconSymbol } from '@/components/ui/icon-symbol';
+import { ThemedText } from "@/components/themed-text";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import { BorderRadius, Colors, FontSizes, Spacing } from "@/constants/theme";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Card } from "./Card";
 
 interface Post {
   id: string;
@@ -18,7 +18,7 @@ interface Post {
   score: number;
   view_count: number;
   created_at: string;
-  user_reaction?: 'up' | 'down' | null;
+  user_reaction?: "up" | "down" | null;
 }
 
 interface PostCardProps {
@@ -28,7 +28,7 @@ interface PostCardProps {
 }
 
 export function PostCard({ post, onUpvote, onDownvote }: PostCardProps) {
-  const colorScheme = useColorScheme() ?? 'light';
+  const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
 
   const formatDate = (dateString: string) => {
@@ -46,7 +46,7 @@ export function PostCard({ post, onUpvote, onDownvote }: PostCardProps) {
     } else if (diffDays < 7) {
       return `hace ${diffDays}d`;
     } else {
-      return date.toLocaleDateString('es-ES');
+      return date.toLocaleDateString("es-ES");
     }
   };
 
@@ -60,7 +60,7 @@ export function PostCard({ post, onUpvote, onDownvote }: PostCardProps) {
         <Image
           source={{ uri: post.imagen_url }}
           style={{
-            width: '100%',
+            width: "100%",
             height: 200,
             borderRadius: BorderRadius.md,
             marginBottom: Spacing.md,
@@ -73,8 +73,15 @@ export function PostCard({ post, onUpvote, onDownvote }: PostCardProps) {
         {post.descripcion}
       </ThemedText>
 
-      <ThemedText style={{ fontSize: FontSizes.sm, color: colors.tabIconDefault, marginBottom: Spacing.md }}>
-        Por {post.creator.full_name || post.creator.email} · {formatDate(post.created_at)}
+      <ThemedText
+        style={{
+          fontSize: FontSizes.sm,
+          color: colors.tabIconDefault,
+          marginBottom: Spacing.md,
+        }}
+      >
+        Por {post.creator.full_name || post.creator.email} ·{" "}
+        {formatDate(post.created_at)}
       </ThemedText>
 
       {/* Sección de reacciones */}
@@ -82,7 +89,7 @@ export function PostCard({ post, onUpvote, onDownvote }: PostCardProps) {
         <TouchableOpacity
           style={[
             styles.reactionButton,
-            post.user_reaction === 'up' && {
+            post.user_reaction === "up" && {
               backgroundColor: colors.tint,
             },
           ]}
@@ -91,24 +98,24 @@ export function PostCard({ post, onUpvote, onDownvote }: PostCardProps) {
           <IconSymbol
             size={18}
             name="arrow.up"
-            color={post.user_reaction === 'up' ? '#fff' : colors.text}
+            color={post.user_reaction === "up" ? "#fff" : colors.text}
           />
           <ThemedText
             style={{
               fontSize: FontSizes.sm,
               marginLeft: Spacing.xs,
-              color: post.user_reaction === 'up' ? '#fff' : colors.text,
+              color: post.user_reaction === "up" ? "#fff" : colors.text,
             }}
           >
-            {post.score > 0 ? post.score : ''}
+            {post.score > 0 ? post.score : ""}
           </ThemedText>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.reactionButton,
-            post.user_reaction === 'down' && {
-              backgroundColor: '#FF6B6B',
+            post.user_reaction === "down" && {
+              backgroundColor: "#FF6B6B",
             },
           ]}
           onPress={() => onDownvote(post.id)}
@@ -116,22 +123,24 @@ export function PostCard({ post, onUpvote, onDownvote }: PostCardProps) {
           <IconSymbol
             size={18}
             name="arrow.down"
-            color={post.user_reaction === 'down' ? '#fff' : colors.text}
+            color={post.user_reaction === "down" ? "#fff" : colors.text}
           />
           <ThemedText
             style={{
               fontSize: FontSizes.sm,
               marginLeft: Spacing.xs,
-              color: post.user_reaction === 'down' ? '#fff' : colors.text,
+              color: post.user_reaction === "down" ? "#fff" : colors.text,
             }}
           >
-            {post.score < 0 ? Math.abs(post.score) : ''}
+            {post.score < 0 ? Math.abs(post.score) : ""}
           </ThemedText>
         </TouchableOpacity>
 
         <View style={styles.viewsContainer}>
           <IconSymbol size={16} name="eye" color={colors.tabIconDefault} />
-          <ThemedText style={{ fontSize: FontSizes.sm, marginLeft: Spacing.xs }}>
+          <ThemedText
+            style={{ fontSize: FontSizes.sm, marginLeft: Spacing.xs }}
+          >
             {post.view_count}
           </ThemedText>
         </View>
@@ -142,24 +151,24 @@ export function PostCard({ post, onUpvote, onDownvote }: PostCardProps) {
 
 const styles = StyleSheet.create({
   reactionsContainer: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: Spacing.md,
     paddingTop: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: "#e0e0e0",
   },
   reactionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
     borderRadius: BorderRadius.sm,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
   },
   viewsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 'auto',
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: "auto",
     paddingVertical: Spacing.xs,
     paddingHorizontal: Spacing.sm,
   },

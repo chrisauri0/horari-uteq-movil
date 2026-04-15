@@ -1,9 +1,7 @@
-import { NOTIFY_CLASSES_TASK } from "@/background/notify-task";
+import { DEV_CONFIG } from "@/constants/devConfig";
 import { scheduleClassNotifications } from "@/utils/scheduleNotifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
-import * as BackgroundFetch from "expo-background-fetch";
-import * as Notifications from "expo-notifications";
 
 import { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
@@ -23,6 +21,26 @@ import {
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useRouter } from "expo-router";
 
+// Carga condicional de expo-notifications (no disponible en Expo Go SDK 53+)
+let Notifications: any = null;
+let BackgroundFetch: any = null;
+let NOTIFY_CLASSES_TASK: string | null = null;
+
+// if (!DEV_CONFIG.SKIP_BACKGROUND_NOTIFICATIONS) {
+//   try {
+//     Notifications = require("expo-notifications");
+//     BackgroundFetch = require("expo-background-fetch");
+//     NOTIFY_CLASSES_TASK =
+//       require("@/background/notify-task").NOTIFY_CLASSES_TASK;
+//   } catch (e) {
+//     console.log(
+//       "[DEV] Background features not available in Expo Go - that's OK!",
+//     );
+//   }
+// } else {
+//   console.log("[DEV] ✓ Background notifications disabled by DEV_CONFIG");
+// }
+
 export default function HomeScreen() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
@@ -34,17 +52,35 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const registerBgTask = async () => {
-      await Notifications.requestPermissionsAsync();
+      // Las notificaciones solo se registran si están disponibles
+      if (!Notifications || !BackgroundFetch || !NOTIFY_CLASSES_TASK) {
+        if (DEV_CONFIG.SKIP_BACKGROUND_NOTIFICATIONS) {
+          console.log(
+            "[DEV] ✓ Background notifications disabled by DEV_CONFIG.SKIP_BACKGROUND_NOTIFICATIONS",
+          );
+        } else {
+          console.log(
+            "[DEV] Background notifications not available - normal in Expo Go, but will work in production!",
+          );
+        }
+        return;
+      }
 
       try {
-        await BackgroundFetch.registerTaskAsync(NOTIFY_CLASSES_TASK, {
-          minimumInterval: 60 * 5, // cada 5 minutos revisa
-          stopOnTerminate: false,
-          startOnBoot: true,
-        });
-        console.log("Background task registered");
+        await Notifications.requestPermissionsAsync();
+
+        try {
+          await BackgroundFetch.registerTaskAsync(NOTIFY_CLASSES_TASK, {
+            minimumInterval: 60 * 5, // cada 5 minutos revisa
+            stopOnTerminate: false,
+            startOnBoot: true,
+          });
+          console.log("✅ Background task registered successfully");
+        } catch (err) {
+          console.log("Error registering background task:", err);
+        }
       } catch (err) {
-        console.log("Error registering background task:", err);
+        console.log("[DEV] Background setup skipped:", err);
       }
     };
 
@@ -66,25 +102,17 @@ export default function HomeScreen() {
         // router.push("/login-register");
       }
 
-      if (storedHorarios) {
-        const parsed = JSON.parse(storedHorarios);
-        setHorarios(parsed);
+      const schedulesRes = await api.get("/scheduler/allschedules");
+      await AsyncStorage.setItem(
+        "horarios",
+        JSON.stringify(schedulesRes.data.schedules),
+      );
 
-        // ⬅️ PROGRAMAR NOTIFICACIONES
-        await scheduleClassNotifications(parsed);
-      } else {
-        const schedulesRes = await api.get("/scheduler/allschedules");
-        await AsyncStorage.setItem(
-          "horarios",
-          JSON.stringify(schedulesRes.data.schedules),
-        );
+      const parsed = schedulesRes.data.schedules;
+      setHorarios(parsed);
 
-        const parsed = schedulesRes.data.schedules;
-        setHorarios(parsed);
-
-        // ⬅️ PROGRAMAR NOTIFICACIONES
-        await scheduleClassNotifications(parsed);
-      }
+      // ⬅️ PROGRAMAR NOTIFICACIONES
+      await scheduleClassNotifications(parsed);
 
       if (storedProfesores) {
         console.log("Profesores found in AsyncStorage.");

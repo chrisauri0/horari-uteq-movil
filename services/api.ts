@@ -7,7 +7,7 @@ import axios, {
 
 const API_BASE_URL =
   process.env.API_BASE_URL || "https://horarios-backend-58w8.onrender.com";
-const API_LOCAL_URL = "http://10.66.16.136:3000"; // Cambia esto si tu backend local tiene otro puerto
+const API_LOCAL_URL = "https://horarios-backend-58w8.onrender.com"; // Cambia esto si tu backend local tiene otro puerto
 
 // Crear instancia de axios
 const api: AxiosInstance = axios.create({
@@ -64,4 +64,3 @@ api.interceptors.response.use(
 
 export default api;
 export { api2, API_BASE_URL };
-

@@ -1,28 +1,42 @@
 import {
-  BorderRadius,
-  FontSizes,
-  Shadows,
-  Spacing,
-  UTEQColors,
+    BorderRadius,
+    FontSizes,
+    Shadows,
+    Spacing,
+    UTEQColors,
 } from "@/constants/theme";
 import React, { useRef } from "react";
 import {
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    NativeScrollEvent,
+    NativeSyntheticEvent,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { ScheduleCard } from "./ScheduleCard";
 
-export interface ScheduleData {
+// Formato antiguo
+export interface LegacyScheduleData {
   start: string; // Ejemplo: "Lun18"
   subj: string;
   prof: string;
   room: string;
   group?: string;
 }
+
+// Formato nuevo del backend
+export interface NewScheduleData {
+  dia: string; // "Lunes", "Martes", etc.
+  hora: string; // "17:00-18:00", "18:00-19:00"
+  materia: string;
+  profesor: string;
+  salon: string;
+  grupo?: string;
+  slot: number;
+}
+
+export type ScheduleData = LegacyScheduleData | NewScheduleData;
 
 export interface ScheduleTableProps {
   data: ScheduleData[];
@@ -31,6 +45,48 @@ export interface ScheduleTableProps {
   showGroup?: boolean;
   colorVariant?: "default" | "psicologos";
 }
+
+// Helper function to normalize data
+const normalizeScheduleData = (
+  item: ScheduleData | any,
+): LegacyScheduleData | null => {
+  if (!item) return null;
+
+  if ("start" in item) {
+    // Already in legacy format
+    return item as LegacyScheduleData;
+  }
+  // Convert from new format to legacy format
+  const newItem = item as NewScheduleData;
+
+  // Validar que los campos necesarios existan
+  if (!newItem.dia || !newItem.hora) {
+    console.warn("[WARNING] Invalid clase format:", item);
+    return null;
+  }
+
+  const dayMap: Record<string, string> = {
+    Lunes: "Lun",
+    Martes: "Mar",
+    Miercoles: "Mie",
+    Jueves: "Jue",
+    Viernes: "Vie",
+    Sabado: "Sab",
+    Domingo: "Dom",
+  };
+
+  const hourMatch = newItem.hora.match(/^(\d{1,2}):/);
+  const hour = hourMatch ? parseInt(hourMatch[1]) : 0;
+  const dayAbbr = dayMap[newItem.dia] || "Lun";
+
+  return {
+    start: `${dayAbbr}${hour}`,
+    subj: newItem.materia || "Sin asignar",
+    prof: newItem.profesor || "Sin profesor",
+    room: newItem.salon || "Sin salón",
+    group: newItem.grupo,
+  };
+};
 
 const CELL_WIDTH = 150;
 const HOUR_CELL_WIDTH = 68;
@@ -55,19 +111,24 @@ export const ScheduleTable: React.FC<ScheduleTableProps> = ({
   };
 
   // Crear matriz vacía
-  const matrix: Record<number, Record<string, ScheduleData | null>> = {};
+  const matrix: Record<number, Record<string, LegacyScheduleData | null>> = {};
   hours.forEach((h) => {
     matrix[h] = {};
     days.forEach((d) => (matrix[h][d] = null));
   });
 
-  // Llenar la matriz con las materias
+  // Llenar la matriz con las materias (normalizando si es necesario)
   data.forEach((c) => {
-    const slot = c.start; // Ejemplo: "Lun18"
+    const normalized = normalizeScheduleData(c);
+    if (!normalized) return; // Skip invalid items
+
+    const slot = normalized.start; // Ejemplo: "Lun18"
+    if (!slot) return; // Skip if no start time
+
     const dia = slot.slice(0, 3);
     const hora = parseInt(slot.slice(3));
     if (matrix[hora] && matrix[hora][dia] !== undefined) {
-      matrix[hora][dia] = c;
+      matrix[hora][dia] = normalized;
     }
   });
 
