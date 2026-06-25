@@ -14,9 +14,8 @@ import {
   Alert,
   Image,
   Platform,
-  Pressable,
   StyleSheet,
-  View,
+  View
 } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -198,7 +197,7 @@ export default function LoginScreen() {
             fullWidth
             style={styles.googleButton}
           />
-          <Button
+          {/* <Button
             title="Continuar con bypass"
             onPress={() => bypass()}
             variant="primary"
@@ -211,7 +210,7 @@ export default function LoginScreen() {
             <ThemedText style={styles.bypassFallbackText}>
               Si no responde, toca aqui para entrar con bypass
             </ThemedText>
-          </Pressable>
+          </Pressable> */}
         </View>
 
         {!request && <ActivityIndicator size="large" style={styles.loader} />}

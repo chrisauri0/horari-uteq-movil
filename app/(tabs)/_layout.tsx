@@ -35,7 +35,7 @@ export default function TabLayout() {
         options={{
           title: "Horarios",
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={24} name="calendar.fill" color={color} />
+            <IconSymbol size={24} name="calendar.circle.fill" color={color} />
           ),
         }}
       />
@@ -68,10 +68,16 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="posts"
+        name="tedis"
         options={{
-          title: 'Anuncios',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell.fill" color={color} />,
+          title: "TDIS",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol
+              size={24}
+              name="book.closed.circle.fill"
+              color={color}
+            />
+          ),
         }}
       />
     </Tabs>

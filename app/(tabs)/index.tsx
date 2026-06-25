@@ -4,7 +4,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
 
 import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -49,6 +55,10 @@ export default function HomeScreen() {
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
+  const pickerTextColor =
+    colorScheme === "dark" ? UTEQColors.gray100 : UTEQColors.textPrimary;
+  const pickerBackgroundColor =
+    colorScheme === "dark" ? UTEQColors.gray800 : UTEQColors.white;
 
   useEffect(() => {
     const registerBgTask = async () => {
@@ -176,8 +186,19 @@ export default function HomeScreen() {
                 onValueChange={(itemValue: string) =>
                   setSelectedGroup(itemValue)
                 }
-                style={[styles.picker, { color: UTEQColors.textPrimary }]}
+                style={[
+                  styles.picker,
+                  {
+                    color: pickerTextColor,
+                    backgroundColor: pickerBackgroundColor,
+                  },
+                ]}
+                itemStyle={{
+                  color: pickerTextColor,
+                  fontSize: FontSizes.base,
+                }}
                 dropdownIconColor={UTEQColors.bluePrimary}
+                mode="dropdown"
               >
                 <Picker.Item
                   label="Selecciona un grupo..."
@@ -306,14 +327,17 @@ const styles = StyleSheet.create({
   pickerCard: {
     padding: 0, // Remove default padding to let picker fill
     borderRadius: BorderRadius.lg,
-    overflow: "hidden",
+    overflow: Platform.OS === "ios" ? "visible" : "hidden",
     backgroundColor: UTEQColors.white,
   },
   pickerWrapper: {
     paddingHorizontal: Spacing.xs,
+    backgroundColor: UTEQColors.white,
+    minHeight: Platform.OS === "ios" ? 160 : 56,
+    justifyContent: "center",
   },
   picker: {
-    height: 56,
+    height: Platform.OS === "ios" ? 160 : 56,
   },
   scheduleCard: {
     padding: Spacing.md,
