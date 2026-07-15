@@ -1,5 +1,5 @@
 // screens/TDIScreen.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Alert,
   FlatList,
@@ -15,6 +15,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { tdiApi } from "@/services/tdiApi";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as DocumentPicker from "expo-document-picker";
+import { uploadToDrive } from "@/utils/googleDrive";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 
@@ -65,151 +69,6 @@ interface SolicitudPropia {
   observacionesAdmin?: string;
 }
 
-// ─── Data mock ──────────────────────────────────────────────────────────────
-
-const TDIS_MOCK: TDI[] = [
-  {
-    id: "1",
-    eje: "Identidad Personal",
-    nombre: "Taller de Pintura en Acuarela",
-    personaEncargada: "Lic. Carmen Rojas",
-    puesto: "Coordinadora Cultural",
-    correo: "carmen.rojas@uteq.edu.mx",
-    telefono: "442 123 4567",
-    tipo: "interna",
-    horasRequeridas: 6,
-    nivelDeImpacto: "2",
-    tdisporGanar: 2,
-    competencias: "Expresión artística, creatividad, concentración",
-    evidencias: "Fotografía de la obra terminada, lista de asistencia",
-    observaciones:
-      "Traer ropa que no les importe manchar. Materiales incluidos.",
-    cupoMaximo: 20,
-    cupoActual: 14,
-    fecha: "5 Jul 2025 · 10:00 AM",
-    lugar: "Sala de Arte, Edificio C",
-    emoji: "🎨",
-  },
-  {
-    id: "2",
-    eje: "Entorno Social",
-    nombre: "Tarde Cineclub — Cine Latinoamericano",
-    personaEncargada: "Mtro. Diego Salinas",
-    puesto: "Coordinador Cultural",
-    correo: "diego.salinas@uteq.edu.mx",
-    telefono: "442 987 6543",
-    tipo: "interna",
-    horasRequeridas: 3,
-    nivelDeImpacto: "1",
-    tdisporGanar: 1,
-    competencias: "Análisis crítico, apreciación cinematográfica",
-    evidencias: "Ticket escaneado, reseña breve",
-    observaciones: "Entrada libre con credencial vigente.",
-    cupoMaximo: 80,
-    cupoActual: 52,
-    fecha: "12 Jul 2025 · 5:00 PM",
-    lugar: "Auditorio Principal",
-    emoji: "🎬",
-  },
-  {
-    id: "3",
-    eje: "Entorno Físico",
-    nombre: "Limpieza y Reforestación Campus",
-    personaEncargada: "Ing. Pablo Mendoza",
-    puesto: "Jefe de Sustentabilidad",
-    correo: "pablo.mendoza@uteq.edu.mx",
-    telefono: "442 555 0011",
-    tipo: "interna",
-    horasRequeridas: 4,
-    nivelDeImpacto: "3",
-    tdisporGanar: 3,
-    competencias: "Conciencia ecológica, trabajo en equipo",
-    evidencias: "Fotografías durante la actividad, lista de asistencia",
-    observaciones: "Zapatos cerrados. Guantes provistos.",
-    cupoMaximo: 40,
-    cupoActual: 11,
-    fecha: "19 Jul 2025 · 8:00 AM",
-    lugar: "Zona Verde Campus Norte",
-    emoji: "🌱",
-  },
-  {
-    id: "4",
-    eje: "Trascendencia",
-    nombre: "Voluntariado Banco de Alimentos",
-    personaEncargada: "Lic. Fernanda Ortiz",
-    puesto: "Enlace de Vinculación Social",
-    correo: "fernanda.ortiz@uteq.edu.mx",
-    telefono: "442 321 7890",
-    tipo: "externa",
-    horasRequeridas: 8,
-    nivelDeImpacto: "4",
-    tdisporGanar: 4,
-    competencias: "Empatía, servicio comunitario, liderazgo social",
-    evidencias: "Carta de participación, fotografías",
-    observaciones: "Transporte por cuenta propia.",
-    cupoMaximo: 15,
-    cupoActual: 9,
-    fecha: "26 Jul 2025 · 9:00 AM",
-    lugar: "Banco de Alimentos Querétaro",
-    emoji: "🤝",
-  },
-  {
-    id: "5",
-    eje: "Identidad Personal",
-    nombre: "Taller de Oratoria y Debate",
-    personaEncargada: "Mtra. Sofía Vega",
-    puesto: "Docente de Comunicación",
-    correo: "sofia.vega@uteq.edu.mx",
-    telefono: "442 654 3210",
-    tipo: "interna",
-    horasRequeridas: 5,
-    nivelDeImpacto: "3",
-    tdisporGanar: 3,
-    competencias: "Comunicación asertiva, argumentación, confianza",
-    evidencias: "Video de participación, lista de asistencia",
-    observaciones: "Preparar un tema de 3 minutos.",
-    cupoMaximo: 18,
-    cupoActual: 18,
-    fecha: "3 Ago 2025 · 3:00 PM",
-    lugar: "Sala de Usos Múltiples, Edificio A",
-    emoji: "🎤",
-  },
-];
-
-const SOLICITUDES_MOCK: SolicitudPropia[] = [
-  {
-    id: "s1",
-    nombre: "Voluntariado en Refugio de Animales",
-    organizacion: "Refugio Patitas Querétaro",
-    correoContacto: "contacto@patitas.org",
-    eje: "Trascendencia",
-    horasRealizadas: 12,
-    descripcion:
-      "Apoyo en cuidado de animales rescatados, limpieza de instalaciones y adopción responsable.",
-    competencias: "Empatía, responsabilidad, trabajo en equipo",
-    evidencias: "Carta del refugio, fotografías de la actividad",
-    observaciones: "Actividad realizada durante vacaciones de verano",
-    estado: "Pendiente",
-    fechaEnvio: "20 Jun 2025",
-  },
-  {
-    id: "s2",
-    nombre: "Curso de Fotografía Urbana",
-    organizacion: "Instituto de Artes de Querétaro",
-    correoContacto: "cursos@iaq.mx",
-    eje: "Identidad Personal",
-    horasRealizadas: 10,
-    descripcion:
-      "Curso de fotografía callejera y composición visual con salidas de campo en el centro histórico.",
-    competencias: "Creatividad, observación, expresión artística",
-    evidencias: "Constancia del instituto, portafolio fotográfico",
-    observaciones: "Se tomó los sábados de mayo",
-    estado: "Aprobada",
-    fechaEnvio: "1 Jun 2025",
-    observacionesAdmin: "Actividad válida. Se asignaron 2 TDIs.",
-  },
-];
-
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const NIVEL_LABELS: Record<NivelImpacto, string> = {
@@ -233,7 +92,7 @@ const EJES: EjeCategoria[] = [
   "Trascendencia",
 ];
 
-const ESTADO_CONFIG: Record<
+const ESTADO_CONFIG: Record
   EstadoSolicitud,
   { color: string; bg: string; emoji: string }
 > = {
@@ -293,29 +152,30 @@ const CupoBar = ({ actual, maximo }: { actual: number; maximo: number }) => {
 // ─── Pantalla principal ──────────────────────────────────────────────────────
 
 export default function TDIScreen() {
-  // ── Tabs y búsqueda ───────────────────────────────────────────────────────
   const [tabActivo, setTabActivo] = useState<"catalogo" | "mis-solicitudes">(
     "catalogo",
   );
   const [busqueda, setBusqueda] = useState("");
   const [ejeActivo, setEjeActivo] = useState<EjeCategoria | "Todos">("Todos");
 
-  // ── Estados de inscripción ────────────────────────────────────────────────
-  const [inscripciones, setInscripciones] = useState<
-    Record<string, EstadoInscripcion>
+  // ── Data desde backend ────────────────────────────────────────────────────
+  const [tdis, setTdis] = useState<TDI[]>([]);
+  const [cargandoCatalogo, setCargandoCatalogo] = useState(false);
+
+  const [solicitudes, setSolicitudes] = useState<SolicitudPropia[]>([]);
+  const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false);
+
+  // ── Inscripciones: { tdiId: { inscripcionId, estado } } ───────────────────
+  const [inscripciones, setInscripciones] = useState
+    Record<string, { inscripcionId: string; estado: EstadoInscripcion }>
   >({});
 
-  // ── Modales catálogo ──────────────────────────────────────────────────────
   const [tdiSeleccionado, setTdiSeleccionado] = useState<TDI | null>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
-
-  // ── Modal evidencia ───────────────────────────────────────────────────────
   const [modalEvidencia, setModalEvidencia] = useState(false);
   const [notaEvidencia, setNotaEvidencia] = useState("");
+  const [subiendoEvidencia, setSubiendoEvidencia] = useState(false);
 
-  // ── Modales solicitudes ───────────────────────────────────────────────────
-  const [solicitudes, setSolicitudes] =
-    useState<SolicitudPropia[]>(SOLICITUDES_MOCK);
   const [modalFormulario, setModalFormulario] = useState(false);
   const [modalDetalleSolicitud, setModalDetalleSolicitud] = useState(false);
   const [solicitudVista, setSolicitudVista] = useState<SolicitudPropia | null>(
@@ -323,11 +183,61 @@ export default function TDIScreen() {
   );
   const [form, setForm] = useState(FORM_INICIAL);
   const [enviando, setEnviando] = useState(false);
-  const [errores, setErrores] = useState<
+  const [errores, setErrores] = useState
     Partial<Record<keyof typeof FORM_INICIAL, string>>
   >({});
 
-  // ── Helpers formulario ────────────────────────────────────────────────────
+  // ── Carga inicial ──────────────────────────────────────────────────────────
+
+  const cargarCatalogo = useCallback(async () => {
+    setCargandoCatalogo(true);
+    try {
+      const [tdisRes, inscripcionesRes] = await Promise.all([
+        tdiApi.getCatalogo(),
+        tdiApi.getMisInscripciones(),
+      ]);
+      setTdis(tdisRes.data);
+
+      const mapaInscripciones: Record
+        string,
+        { inscripcionId: string; estado: EstadoInscripcion }
+      > = {};
+      (inscripcionesRes.data ?? []).forEach((insc: any) => {
+        mapaInscripciones[insc.tdiId] = {
+          inscripcionId: insc.id,
+          estado:
+            insc.estado === "finalizado" || insc.estado === "en_proceso"
+              ? "evidencia_subida"
+              : "inscrito",
+        };
+      });
+      setInscripciones(mapaInscripciones);
+    } catch (err) {
+      console.log("Error cargando catálogo TDI:", err);
+      Alert.alert("Error", "No se pudo cargar el catálogo de actividades.");
+    } finally {
+      setCargandoCatalogo(false);
+    }
+  }, []);
+
+  const cargarSolicitudes = useCallback(async () => {
+    setCargandoSolicitudes(true);
+    try {
+      const res = await tdiApi.getMisSolicitudes();
+      setSolicitudes(res.data);
+    } catch (err) {
+      console.log("Error cargando solicitudes:", err);
+    } finally {
+      setCargandoSolicitudes(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    cargarCatalogo();
+    cargarSolicitudes();
+  }, [cargarCatalogo, cargarSolicitudes]);
+
+  // ── Helpers formulario ─────────────────────────────────────────────────────
 
   const setField = (key: keyof typeof FORM_INICIAL, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -346,40 +256,41 @@ export default function TDIScreen() {
     return Object.keys(e).length === 0;
   };
 
+  // ── Enviar solicitud ───────────────────────────────────────────────────────
+
   const handleEnviarSolicitud = async () => {
     if (!validarForm()) return;
     setEnviando(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    const nueva: SolicitudPropia = {
-      id: `s${Date.now()}`,
-      nombre: form.nombre,
-      organizacion: form.organizacion,
-      correoContacto: form.correoContacto,
-      eje: form.eje as EjeCategoria,
-      horasRealizadas: Number(form.horasRealizadas),
-      descripcion: form.descripcion,
-      competencias: form.competencias,
-      evidencias: form.evidencias,
-      observaciones: form.observaciones,
-      estado: "Pendiente",
-      fechaEnvio: new Date().toLocaleDateString("es-MX", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      }),
-    };
-    setSolicitudes((prev) => [nueva, ...prev]);
-    setForm(FORM_INICIAL);
-    setModalFormulario(false);
-    setEnviando(false);
-    setTabActivo("mis-solicitudes");
-    Alert.alert(
-      "¡Solicitud enviada! 🎉",
-      "El equipo TDI revisará tu propuesta. Te notificaremos por correo.",
-    );
+    try {
+      await tdiApi.crearSolicitud({
+        nombre: form.nombre,
+        organizacion: form.organizacion,
+        correoContacto: form.correoContacto,
+        eje: form.eje,
+        horasRealizadas: Number(form.horasRealizadas),
+        descripcion: form.descripcion,
+        competencias: form.competencias,
+        evidencias: form.evidencias,
+        observaciones: form.observaciones,
+      });
+
+      await cargarSolicitudes();
+      setForm(FORM_INICIAL);
+      setModalFormulario(false);
+      setTabActivo("mis-solicitudes");
+      Alert.alert(
+        "¡Solicitud enviada! 🎉",
+        "El equipo TDI revisará tu propuesta. Te notificaremos por correo.",
+      );
+    } catch (err) {
+      console.log("Error enviando solicitud:", err);
+      Alert.alert("Error", "No se pudo enviar tu solicitud. Intenta de nuevo.");
+    } finally {
+      setEnviando(false);
+    }
   };
 
-  // ── Inscripción ───────────────────────────────────────────────────────────
+  // ── Inscripción ────────────────────────────────────────────────────────────
 
   const handleInscribir = (tdi: TDI) => {
     Alert.alert(
@@ -389,20 +300,36 @@ export default function TDIScreen() {
         { text: "Cancelar", style: "cancel" },
         {
           text: "Inscribirme",
-          onPress: () => {
-            setInscripciones((prev) => ({ ...prev, [tdi.id]: "inscrito" }));
-            setModalDetalle(false);
-            Alert.alert(
-              "¡Listo! 🎉",
-              "Te inscribiste correctamente. Recibirás un correo de confirmación.",
-            );
+          onPress: async () => {
+            try {
+              const res = await tdiApi.inscribirse(tdi.id);
+              setInscripciones((prev) => ({
+                ...prev,
+                [tdi.id]: { inscripcionId: res.data.id, estado: "inscrito" },
+              }));
+              setModalDetalle(false);
+              Alert.alert(
+                "¡Listo! 🎉",
+                "Te inscribiste correctamente. Recibirás un correo de confirmación.",
+              );
+            } catch (err: any) {
+              console.log("Error al inscribirse:", err);
+              if (err?.response?.status === 409) {
+                Alert.alert(
+                  "Ya estás inscrito",
+                  "Ya tienes una inscripción en esta actividad.",
+                );
+              } else {
+                Alert.alert("Error", "No se pudo completar la inscripción.");
+              }
+            }
           },
         },
       ],
     );
   };
 
-  // ── Evidencia ─────────────────────────────────────────────────────────────
+  // ── Evidencia ──────────────────────────────────────────────────────────────
 
   const abrirModalEvidencia = (tdi: TDI) => {
     setTdiSeleccionado(tdi);
@@ -411,39 +338,71 @@ export default function TDIScreen() {
     setModalEvidencia(true);
   };
 
-  const handleSubirEvidencia = () => {
+  const handleSubirEvidencia = async () => {
     if (!notaEvidencia.trim()) {
       Alert.alert("Campo requerido", "Agrega una descripción de tu evidencia.");
       return;
     }
-    Alert.alert(
-      "Subir evidencia",
-      "Se registrará tu nota. En la versión final podrás adjuntar archivos.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Enviar",
-          onPress: () => {
-            setInscripciones((prev) => ({
-              ...prev,
-              [tdiSeleccionado!.id]: "evidencia_subida",
-            }));
-            setModalEvidencia(false);
-            setNotaEvidencia("");
-            setTdiSeleccionado(null);
-            Alert.alert(
-              "Enviado ✅",
-              "Tu evidencia fue enviada para revisión.",
-            );
-          },
+    if (!tdiSeleccionado) return;
+
+    const inscripcion = inscripciones[tdiSeleccionado.id];
+    if (!inscripcion) {
+      Alert.alert(
+        "Error",
+        "No se encontró tu inscripción para esta actividad.",
+      );
+      return;
+    }
+
+    setSubiendoEvidencia(true);
+    try {
+      const resultado = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/*"],
+        copyToCacheDirectory: true,
+      });
+
+      let evidenciaUrl = "";
+      if (!resultado.canceled) {
+        const accessToken = await AsyncStorage.getItem("googleAccessToken");
+        if (!accessToken) {
+          Alert.alert(
+            "Sesión expirada",
+            "Vuelve a iniciar sesión con Google para subir tu evidencia.",
+          );
+          setSubiendoEvidencia(false);
+          return;
+        }
+        evidenciaUrl = await uploadToDrive(accessToken, resultado.assets[0]);
+      }
+
+      await tdiApi.subirEvidencia(
+        inscripcion.inscripcionId,
+        evidenciaUrl,
+        notaEvidencia,
+      );
+
+      setInscripciones((prev) => ({
+        ...prev,
+        [tdiSeleccionado.id]: {
+          ...prev[tdiSeleccionado.id],
+          estado: "evidencia_subida",
         },
-      ],
-    );
+      }));
+      setModalEvidencia(false);
+      setNotaEvidencia("");
+      setTdiSeleccionado(null);
+      Alert.alert("Enviado ✅", "Tu evidencia fue enviada para revisión.");
+    } catch (err) {
+      console.log("Error subiendo evidencia:", err);
+      Alert.alert("Error", "No se pudo subir tu evidencia. Intenta de nuevo.");
+    } finally {
+      setSubiendoEvidencia(false);
+    }
   };
 
-  // ── Filtrado catálogo ─────────────────────────────────────────────────────
+  // ── Filtrado catálogo ──────────────────────────────────────────────────────
 
-  const tdisFiltrados = TDIS_MOCK.filter((t) => {
+  const tdisFiltrados = tdis.filter((t) => {
     const matchEje = ejeActivo === "Todos" || t.eje === ejeActivo;
     const q = busqueda.toLowerCase();
     return (
@@ -496,7 +455,8 @@ export default function TDIScreen() {
 
   const renderCardCatalogo = ({ item: tdi }: { item: TDI }) => {
     const color = EJE_COLORS[tdi.eje];
-    const estado = inscripciones[tdi.id];
+    const inscripcion = inscripciones[tdi.id];
+    const estado = inscripcion?.estado;
     const lleno = tdi.cupoActual >= tdi.cupoMaximo && !estado;
 
     return (
@@ -510,7 +470,6 @@ export default function TDIScreen() {
       >
         <View style={[styles.cardAccent, { backgroundColor: color }]} />
         <View style={styles.cardBody}>
-          {/* Header */}
           <View style={styles.cardHeader}>
             <Text style={styles.cardEmoji}>{tdi.emoji}</Text>
             <View style={{ flex: 1 }}>
@@ -539,7 +498,6 @@ export default function TDIScreen() {
             )}
           </View>
 
-          {/* Meta */}
           <View style={{ gap: 2, marginBottom: 8 }}>
             <Text style={styles.metaItem}>📅 {tdi.fecha}</Text>
             <Text style={styles.metaItem}>📍 {tdi.lugar}</Text>
@@ -550,7 +508,6 @@ export default function TDIScreen() {
 
           <CupoBar actual={tdi.cupoActual} maximo={tdi.cupoMaximo} />
 
-          {/* Footer */}
           <View style={styles.cardFooter}>
             <View style={{ flexDirection: "row", gap: 6 }}>
               <Badge label={NIVEL_LABELS[tdi.nivelDeImpacto]} color={color} />
@@ -571,9 +528,7 @@ export default function TDIScreen() {
             ) : estado === "inscrito" ? (
               <TouchableOpacity
                 style={[styles.btnAccion, { backgroundColor: "#F59E0B" }]}
-                onPress={(e) => {
-                  abrirModalEvidencia(tdi);
-                }}
+                onPress={() => abrirModalEvidencia(tdi)}
               >
                 <Text style={styles.btnAccionText}>📤 Evidencia</Text>
               </TouchableOpacity>
@@ -662,7 +617,6 @@ export default function TDIScreen() {
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8F9FF" />
 
-      {/* ── Header ── */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Actividades TDI</Text>
@@ -676,7 +630,6 @@ export default function TDIScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Tabs ── */}
       <View style={styles.tabs}>
         {(
           [
@@ -710,9 +663,6 @@ export default function TDIScreen() {
         ))}
       </View>
 
-      {/* ══════════════════════════════════════
-          TAB — Catálogo
-      ══════════════════════════════════════ */}
       {tabActivo === "catalogo" && (
         <>
           <View style={styles.searchBox}>
@@ -760,19 +710,20 @@ export default function TDIScreen() {
             renderItem={renderCardCatalogo}
             contentContainerStyle={styles.lista}
             showsVerticalScrollIndicator={false}
+            refreshing={cargandoCatalogo}
+            onRefresh={cargarCatalogo}
             ListEmptyComponent={
               <View style={styles.emptyState}>
                 <Text style={styles.emptyEmoji}>🔎</Text>
-                <Text style={styles.emptyText}>Sin resultados</Text>
+                <Text style={styles.emptyText}>
+                  {cargandoCatalogo ? "Cargando..." : "Sin resultados"}
+                </Text>
               </View>
             }
           />
         </>
       )}
 
-      {/* ══════════════════════════════════════
-          TAB — Mis solicitudes
-      ══════════════════════════════════════ */}
       {tabActivo === "mis-solicitudes" && (
         <FlatList
           data={solicitudes}
@@ -780,6 +731,8 @@ export default function TDIScreen() {
           renderItem={renderCardSolicitud}
           contentContainerStyle={styles.lista}
           showsVerticalScrollIndicator={false}
+          refreshing={cargandoSolicitudes}
+          onRefresh={cargarSolicitudes}
           ListHeaderComponent={
             <TouchableOpacity
               style={styles.btnProponerLarge}
@@ -794,7 +747,9 @@ export default function TDIScreen() {
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>📭</Text>
               <Text style={styles.emptyText}>
-                Aún no has enviado solicitudes
+                {cargandoSolicitudes
+                  ? "Cargando..."
+                  : "Aún no has enviado solicitudes"}
               </Text>
               <TouchableOpacity
                 style={[styles.btnAccion, { marginTop: 16 }]}
@@ -807,9 +762,7 @@ export default function TDIScreen() {
         />
       )}
 
-      {/* ════════════════════════════════════════════
-          MODAL — Detalle TDI catálogo
-      ════════════════════════════════════════════ */}
+      {/* MODAL — Detalle TDI catálogo */}
       <Modal
         visible={modalDetalle}
         animationType="slide"
@@ -821,7 +774,8 @@ export default function TDIScreen() {
             {tdiSeleccionado &&
               (() => {
                 const color = EJE_COLORS[tdiSeleccionado.eje];
-                const estado = inscripciones[tdiSeleccionado.id];
+                const inscripcion = inscripciones[tdiSeleccionado.id];
+                const estado = inscripcion?.estado;
                 const lleno =
                   tdiSeleccionado.cupoActual >= tdiSeleccionado.cupoMaximo &&
                   !estado;
@@ -995,9 +949,7 @@ export default function TDIScreen() {
         </View>
       </Modal>
 
-      {/* ════════════════════════════════════════════
-          MODAL — Subir evidencia
-      ════════════════════════════════════════════ */}
+      {/* MODAL — Subir evidencia */}
       <Modal
         visible={modalEvidencia}
         animationType="slide"
@@ -1041,14 +993,13 @@ export default function TDIScreen() {
                   </Text>
                 </View>
 
-                {/* Zona adjunto — placeholder para expo-image-picker + Drive */}
-                <TouchableOpacity style={styles.uploadZone}>
+                <View style={styles.uploadZone}>
                   <Text style={styles.uploadIcon}>📷</Text>
-                  <Text style={styles.uploadText}>Adjuntar foto o archivo</Text>
-                  <Text style={styles.uploadSub}>
-                    Disponible en versión final
+                  <Text style={styles.uploadText}>
+                    Se te pedirá el archivo al enviar
                   </Text>
-                </TouchableOpacity>
+                  <Text style={styles.uploadSub}>PDF o imagen</Text>
+                </View>
 
                 <View style={styles.campoGroup}>
                   <Text style={styles.campoLabel}>
@@ -1067,10 +1018,17 @@ export default function TDIScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.btnPrimario, { backgroundColor: "#F59E0B" }]}
+                  style={[
+                    styles.btnPrimario,
+                    { backgroundColor: "#F59E0B" },
+                    subiendoEvidencia && { opacity: 0.7 },
+                  ]}
                   onPress={handleSubirEvidencia}
+                  disabled={subiendoEvidencia}
                 >
-                  <Text style={styles.btnPrimarioText}>Enviar evidencia</Text>
+                  <Text style={styles.btnPrimarioText}>
+                    {subiendoEvidencia ? "Subiendo..." : "Enviar evidencia"}
+                  </Text>
                 </TouchableOpacity>
 
                 <View style={{ height: 30 }} />
@@ -1080,9 +1038,7 @@ export default function TDIScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ════════════════════════════════════════════
-          MODAL — Detalle solicitud propia
-      ════════════════════════════════════════════ */}
+      {/* MODAL — Detalle solicitud propia */}
       <Modal
         visible={modalDetalleSolicitud}
         animationType="slide"
@@ -1264,9 +1220,7 @@ export default function TDIScreen() {
         </View>
       </Modal>
 
-      {/* ════════════════════════════════════════════
-          MODAL — Formulario nueva solicitud
-      ════════════════════════════════════════════ */}
+      {/* MODAL — Formulario nueva solicitud */}
       <Modal
         visible={modalFormulario}
         animationType="slide"
@@ -1330,7 +1284,6 @@ export default function TDIScreen() {
                   keyboardType="email-address"
                 />
 
-                {/* Selector eje */}
                 <View style={styles.campoGroup}>
                   <Text style={styles.campoLabel}>Eje TDI *</Text>
                   <View style={styles.ejeSelector}>
@@ -1422,8 +1375,6 @@ export default function TDIScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F8F9FF" },
-
-  // Header
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1441,8 +1392,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   btnNuevaSolicitudText: { color: "#fff", fontWeight: "700", fontSize: 14 },
-
-  // Tabs
   tabs: {
     flexDirection: "row",
     marginHorizontal: 20,
@@ -1479,8 +1428,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   tabBadgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
-
-  // Búsqueda
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -1495,8 +1442,6 @@ const styles = StyleSheet.create({
   },
   searchIcon: { fontSize: 16, marginRight: 8 },
   searchInput: { flex: 1, height: 44, fontSize: 15, color: "#1F2937" },
-
-  // Filtros
   filtrosScroll: { paddingHorizontal: 20, paddingBottom: 10, gap: 8 },
   filtroChip: {
     paddingHorizontal: 14,
@@ -1508,8 +1453,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   filtroText: { fontSize: 13, fontWeight: "600", color: "#4B5563" },
-
-  // Lista
   lista: { paddingHorizontal: 20, paddingBottom: 30 },
   btnProponerLarge: {
     borderWidth: 2,
@@ -1522,8 +1465,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F3FF",
   },
   btnProponerLargeText: { color: "#6C63FF", fontWeight: "700", fontSize: 15 },
-
-  // Cards
   card: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -1589,8 +1530,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   notaAdminText: { fontSize: 12, color: "#92400E" },
-
-  // Cupo bar
   cupoContainer: { marginVertical: 6 },
   cupoBarBg: {
     height: 6,
@@ -1601,13 +1540,9 @@ const styles = StyleSheet.create({
   },
   cupoBarFill: { height: "100%", borderRadius: 3 },
   cupoText: { fontSize: 11, color: "#6B7280" },
-
-  // Empty state
   emptyState: { alignItems: "center", paddingTop: 60 },
   emptyEmoji: { fontSize: 40, marginBottom: 12 },
   emptyText: { fontSize: 16, color: "#6B7280" },
-
-  // Modal base
   modalOverlay: {
     flex: 1,
     backgroundColor: "#00000066",
@@ -1644,8 +1579,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   estadoPillText: { fontSize: 14, fontWeight: "700" },
-
-  // Stats row
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-around",
@@ -1657,8 +1590,6 @@ const styles = StyleSheet.create({
   statBox: { alignItems: "center" },
   statNum: { fontSize: 22, fontWeight: "800", color: "#1E1B4B" },
   statLbl: { fontSize: 11, color: "#6B7280", marginTop: 2 },
-
-  // Secciones
   seccion: { marginBottom: 16 },
   seccionTitulo: {
     fontSize: 14,
@@ -1668,8 +1599,6 @@ const styles = StyleSheet.create({
   },
   seccionTexto: { fontSize: 14, color: "#4B5563", lineHeight: 21 },
   seccionSub: { fontSize: 13, color: "#6B7280", marginTop: 3 },
-
-  // Nota admin modal
   notaAdminModal: {
     borderLeftWidth: 4,
     borderRadius: 10,
@@ -1678,8 +1607,6 @@ const styles = StyleSheet.create({
   },
   notaAdminTitulo: { fontSize: 13, fontWeight: "700", marginBottom: 4 },
   notaAdminTexto: { fontSize: 14, lineHeight: 20 },
-
-  // Info estado
   infoEstado: {
     borderWidth: 1.5,
     borderRadius: 12,
@@ -1688,8 +1615,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   infoEstadoText: { fontSize: 14, lineHeight: 21, fontWeight: "500" },
-
-  // Botón primario
   btnPrimario: {
     backgroundColor: "#6C63FF",
     borderRadius: 16,
@@ -1698,8 +1623,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   btnPrimarioText: { color: "#fff", fontSize: 16, fontWeight: "800" },
-
-  // Upload
   uploadZone: {
     borderWidth: 2,
     borderColor: "#E5E7EB",
@@ -1713,8 +1636,6 @@ const styles = StyleSheet.create({
   uploadIcon: { fontSize: 32, marginBottom: 8 },
   uploadText: { fontSize: 15, fontWeight: "600", color: "#4B5563" },
   uploadSub: { fontSize: 12, color: "#9CA3AF", marginTop: 4 },
-
-  // Formulario
   avisoBox: {
     backgroundColor: "#EEF2FF",
     borderRadius: 12,

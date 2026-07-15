@@ -80,6 +80,20 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="justificantes"
+        options={{
+          title: "Justificantes",
+          tabBarIcon: ({ color }) => (
+            <IconSymbol
+              size={24}
+              name="book.closed.circle.fill"
+              color={color}
+            />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
