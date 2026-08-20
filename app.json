@@ -11,16 +11,20 @@
     "ios": {
       "bundleIdentifier": "com.chrisauri0.horariuteq",
       "buildNumber": "1.0.0",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.chrisauri0.horariuteq",
-      "permissions": ["RECEIVE_BOOT_COMPLETED"],
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED"
+      ],
       "notification": {
         "icon": "./assets/images/logo-notificacion.png",
         "color": "#0050b5"
       },
-
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -42,7 +46,6 @@
           "color": "#0050b5"
         }
       ],
-
       "expo-router",
       [
         "expo-splash-screen",

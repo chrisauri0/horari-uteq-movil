@@ -10,7 +10,7 @@ export async function subirEvidenciaDrive(
 
   // 1. Leer el archivo como base64
   const base64 = await FileSystem.readAsStringAsync(localUri, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: "base64",
   });
 
   // 2. Subir a Drive con multipart upload

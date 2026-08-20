@@ -15,7 +15,7 @@ import {
   Image,
   Platform,
   StyleSheet,
-  View
+  View,
 } from "react-native";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -37,6 +37,7 @@ export default function LoginScreen() {
       "email",
       "profile",
       "https://www.googleapis.com/auth/calendar",
+      "https://www.googleapis.com/auth/drive.file", // 👈 agregar esto
     ],
     extraParams: { hd: "uteq.edu.mx" }, // 🔐 SOLO UTEQ
   });
@@ -46,7 +47,6 @@ export default function LoginScreen() {
       if (response?.type === "success") {
         const authentication = response.authentication;
 
-        // Verificar que authentication y accessToken existan
         if (!authentication?.accessToken) {
           console.warn(
             "No authentication/accessToken returned from Google auth response.",
@@ -55,79 +55,64 @@ export default function LoginScreen() {
           return;
         }
 
-        // Guardar accessToken
+        // Guarda el accessToken para llamar Google Calendar API después
         await AsyncStorage.setItem(
           "googleAccessToken",
           authentication.accessToken,
         );
 
-        // Obtener info del usuario
-        fetchUserInfo(authentication.accessToken);
+        // 👇 PERO al backend le mandas el idToken, no el accessToken
+        if (!authentication.idToken) {
+          console.log(
+            "AUTH RESPONSE:",
+            JSON.stringify(authentication, null, 2),
+          );
+          console.warn("No idToken returned from Google auth response.");
+          Alert.alert("Error", "No se recibió el token de identidad.");
+          return;
+        }
+
+        console.log("AUTH RESPONSE:", JSON.stringify(authentication, null, 2));
+
+        fetchUserInfo(authentication.idToken);
       }
     };
 
     handleLogin();
   }, [response]);
 
-  const fetchUserInfo = async (accessToken?: string) => {
+  const fetchUserInfo = async (idToken: string) => {
     try {
-      const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await api.post("/users/auth/google", { idToken });
 
-      const user = await res.json();
-      console.log("User Google:", user);
-      setUser(user);
-      await AsyncStorage.setItem("user", JSON.stringify(user));
-
-      try {
-        const schedulesRes = await api.get("/scheduler/allschedules");
-        await AsyncStorage.setItem(
-          "horarios",
-          JSON.stringify(schedulesRes.data.schedules),
-        );
-      } catch (err) {
-        console.log("Error fetching schedules:", err);
-      }
-
-      try {
-        const psicologosRes = await api2.get("/psicologos");
-        const psicologosData = Array.isArray(psicologosRes.data)
-          ? psicologosRes.data
-          : (psicologosRes.data?.psicologos ?? []);
-        await AsyncStorage.setItem(
-          "psicologos",
-          JSON.stringify(psicologosData),
-        );
-      } catch (err) {
-        console.log("Error fetching psicologos:", err);
-      }
-
-      try {
-        const profesoresRes = await api.get("/profesores/movil");
-        await AsyncStorage.setItem(
-          "profesores",
-          JSON.stringify(profesoresRes.data.profesores),
-        );
-      } catch (err) {
-        console.log("Error fetching profesores :", err);
-      }
-
-      if (!user.email.endsWith("@uteq.edu.mx")) {
-        Alert.alert("Error", "Debes usar un correo @uteq.edu.mx válido.");
+      if (!res.data.success) {
+        Alert.alert("Error", res.data.error || "No se pudo iniciar sesión");
         return;
       }
 
-      Alert.alert("Bienvenido", `${user.name}`);
+      // Guarda TU JWT, no el accessToken de Google
+      // await AsyncStorage.setItem("token", res.data.token);
 
-      // Guardar en tu global state, context, etc (si aplica)
+      // LoginScreen.tsx
+      await AsyncStorage.setItem("access_token", res.data.token); // antes decía "token"
+      await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
 
-      router.push("/"); // 🚀 Ir a Home
+      // Ahora sí, con tu JWT ya guardado, tu interceptor de axios (api/api2)
+      // debe agregarlo automático a las siguientes llamadas
+      const schedulesRes = await api.get("/scheduler/allschedules");
+      await AsyncStorage.setItem(
+        "horarios",
+        JSON.stringify(schedulesRes.data.schedules),
+      );
+
+      Alert.alert("Bienvenido", res.data.user.full_name);
+      router.push("/");
     } catch (err) {
       console.log(err);
       Alert.alert("Error", "No se pudo iniciar sesión.");
     }
   };
+
   const bypass = async () => {
     // Usuario de prueba local para entrar sin Google
     const localUser = {

@@ -1,5 +1,9 @@
 // screens/TDIScreen.tsx
-import React, { useState, useEffect, useCallback } from "react";
+import { subirEvidenciaDrive } from "@/services/driveUpload";
+import { tdiApi } from "@/services/tdiApi";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as DocumentPicker from "expo-document-picker";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -15,10 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { tdiApi } from "@/services/tdiApi";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as DocumentPicker from "expo-document-picker";
-import { uploadToDrive } from "@/utils/googleDrive";
 
 // ─── Tipos ─────────────────────────────────────────────────────────────────
 
@@ -46,27 +46,28 @@ interface TDI {
   competencias: string;
   evidencias: string;
   observaciones: string;
-  cupoMaximo: number;
+  cupoMaximo: number | null;
   cupoActual: number;
-  fecha: string;
-  lugar: string;
-  emoji: string;
+  fecha: string | null;
+  lugar: string | null;
+  emoji: string | null;
 }
 
 interface SolicitudPropia {
   id: string;
-  nombre: string;
-  organizacion: string;
-  correoContacto: string;
+  nombre_solicitud: string;
+  matricula: string;
   eje: EjeCategoria;
-  horasRealizadas: number;
-  descripcion: string;
+  horas_requeridas: number;
+  persona_encargada: string;
+  puesto: string;
+  telefono: string;
+  correo: string;
   competencias: string;
   evidencias: string;
   observaciones: string;
   estado: EstadoSolicitud;
-  fechaEnvio: string;
-  observacionesAdmin?: string;
+  created_at: string;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ const EJES: EjeCategoria[] = [
   "Trascendencia",
 ];
 
-const ESTADO_CONFIG: Record
+const ESTADO_CONFIG: Record<
   EstadoSolicitud,
   { color: string; bg: string; emoji: string }
 > = {
@@ -101,13 +102,19 @@ const ESTADO_CONFIG: Record
   Rechazada: { color: "#EF4444", bg: "#FEE2E2", emoji: "❌" },
 };
 
+// 👇 Formulario actualizado: agregamos matricula + contacto externo,
+// quitamos organizacion/correoContacto sueltos, descripcion se funde en observaciones
 const FORM_INICIAL = {
-  nombre: "",
-  organizacion: "",
-  correoContacto: "",
+  matricula: "",
+  nombreSolicitud: "",
   eje: "" as EjeCategoria | "",
   horasRealizadas: "",
-  descripcion: "",
+  personaEncargada: "",
+  puesto: "",
+  telefono: "",
+  extension: "",
+  correo: "", // correo del contacto/supervisor externo, no del alumno
+  descripcion: "", // se envía dentro de observaciones
   competencias: "",
   evidencias: "",
   observaciones: "",
@@ -126,7 +133,22 @@ const Badge = ({ label, color }: { label: string; color: string }) => (
   </View>
 );
 
-const CupoBar = ({ actual, maximo }: { actual: number; maximo: number }) => {
+const CupoBar = ({
+  actual,
+  maximo,
+}: {
+  actual: number;
+  maximo: number | null;
+}) => {
+  // cupo_maximo es nullable en el backend -> null significa cupo ilimitado
+  if (maximo === null) {
+    return (
+      <View style={styles.cupoContainer}>
+        <Text style={styles.cupoText}>{actual} inscritos · Cupo abierto</Text>
+      </View>
+    );
+  }
+
   const pct = Math.min(actual / maximo, 1);
   const lleno = actual >= maximo;
   return (
@@ -166,7 +188,7 @@ export default function TDIScreen() {
   const [cargandoSolicitudes, setCargandoSolicitudes] = useState(false);
 
   // ── Inscripciones: { tdiId: { inscripcionId, estado } } ───────────────────
-  const [inscripciones, setInscripciones] = useState
+  const [inscripciones, setInscripciones] = useState<
     Record<string, { inscripcionId: string; estado: EstadoInscripcion }>
   >({});
 
@@ -183,7 +205,7 @@ export default function TDIScreen() {
   );
   const [form, setForm] = useState(FORM_INICIAL);
   const [enviando, setEnviando] = useState(false);
-  const [errores, setErrores] = useState
+  const [errores, setErrores] = useState<
     Partial<Record<keyof typeof FORM_INICIAL, string>>
   >({});
 
@@ -198,15 +220,15 @@ export default function TDIScreen() {
       ]);
       setTdis(tdisRes.data);
 
-      const mapaInscripciones: Record
+      const mapaInscripciones: Record<
         string,
         { inscripcionId: string; estado: EstadoInscripcion }
       > = {};
       (inscripcionesRes.data ?? []).forEach((insc: any) => {
-        mapaInscripciones[insc.tdiId] = {
+        mapaInscripciones[insc.tdi_id] = {
           inscripcionId: insc.id,
           estado:
-            insc.estado === "finalizado" || insc.estado === "en_proceso"
+            insc.estado === "aprobado" || insc.estado === "en_revision"
               ? "evidencia_subida"
               : "inscrito",
         };
@@ -246,12 +268,19 @@ export default function TDIScreen() {
 
   const validarForm = () => {
     const e: Partial<Record<keyof typeof FORM_INICIAL, string>> = {};
-    if (!form.nombre.trim()) e.nombre = "Requerido";
-    if (!form.organizacion.trim()) e.organizacion = "Requerido";
+    if (!form.matricula.trim()) e.matricula = "Requerido";
+    if (!form.nombreSolicitud.trim()) e.nombreSolicitud = "Requerido";
     if (!form.eje) e.eje = "Selecciona un eje";
     if (!form.horasRealizadas || isNaN(Number(form.horasRealizadas)))
       e.horasRealizadas = "Ingresa un número válido";
+    if (!form.personaEncargada.trim()) e.personaEncargada = "Requerido";
+    if (!form.puesto.trim()) e.puesto = "Requerido";
+    if (!form.telefono.trim()) e.telefono = "Requerido";
+    if (!form.correo.trim() || !form.correo.includes("@"))
+      e.correo = "Correo de contacto inválido";
     if (!form.descripcion.trim()) e.descripcion = "Requerido";
+    if (!form.competencias.trim()) e.competencias = "Requerido";
+    if (!form.evidencias.trim()) e.evidencias = "Requerido";
     setErrores(e);
     return Object.keys(e).length === 0;
   };
@@ -262,16 +291,25 @@ export default function TDIScreen() {
     if (!validarForm()) return;
     setEnviando(true);
     try {
+      // 👇 descripcion se funde con observaciones porque el backend no tiene
+      // un campo separado para ella (ver nota en el chat)
+      const observacionesCombinadas = form.observaciones.trim()
+        ? `Descripción: ${form.descripcion}\n\nObservaciones: ${form.observaciones}`
+        : `Descripción: ${form.descripcion}`;
+
       await tdiApi.crearSolicitud({
-        nombre: form.nombre,
-        organizacion: form.organizacion,
-        correoContacto: form.correoContacto,
+        matricula: form.matricula,
+        nombreSolicitud: form.nombreSolicitud,
         eje: form.eje,
-        horasRealizadas: Number(form.horasRealizadas),
-        descripcion: form.descripcion,
+        horasRequeridas: Number(form.horasRealizadas),
+        personaEncargada: form.personaEncargada,
+        puesto: form.puesto,
+        telefono: form.telefono,
+        extension: form.extension || undefined,
+        correo: form.correo,
         competencias: form.competencias,
         evidencias: form.evidencias,
-        observaciones: form.observaciones,
+        observaciones: observacionesCombinadas,
       });
 
       await cargarSolicitudes();
@@ -282,9 +320,12 @@ export default function TDIScreen() {
         "¡Solicitud enviada! 🎉",
         "El equipo TDI revisará tu propuesta. Te notificaremos por correo.",
       );
-    } catch (err) {
+    } catch (err: any) {
       console.log("Error enviando solicitud:", err);
-      Alert.alert("Error", "No se pudo enviar tu solicitud. Intenta de nuevo.");
+      const msg =
+        err?.response?.data?.message ||
+        "No se pudo enviar tu solicitud. Intenta de nuevo.";
+      Alert.alert("Error", Array.isArray(msg) ? msg.join("\n") : msg);
     } finally {
       setEnviando(false);
     }
@@ -318,6 +359,12 @@ export default function TDIScreen() {
                 Alert.alert(
                   "Ya estás inscrito",
                   "Ya tienes una inscripción en esta actividad.",
+                );
+              } else if (err?.response?.status === 400) {
+                Alert.alert(
+                  "Sin cupo",
+                  err?.response?.data?.message ??
+                    "No hay cupo disponible para esta actividad.",
                 );
               } else {
                 Alert.alert("Error", "No se pudo completar la inscripción.");
@@ -361,19 +408,37 @@ export default function TDIScreen() {
         copyToCacheDirectory: true,
       });
 
-      let evidenciaUrl = "";
-      if (!resultado.canceled) {
-        const accessToken = await AsyncStorage.getItem("googleAccessToken");
-        if (!accessToken) {
-          Alert.alert(
-            "Sesión expirada",
-            "Vuelve a iniciar sesión con Google para subir tu evidencia.",
-          );
-          setSubiendoEvidencia(false);
-          return;
-        }
-        evidenciaUrl = await uploadToDrive(accessToken, resultado.assets[0]);
+      // 👇 Fix: si el usuario cancela el picker, no se envía la evidencia.
+      // Antes esto seguía adelante con evidenciaUrl = "" y marcaba como enviada.
+      if (resultado.canceled) {
+        setSubiendoEvidencia(false);
+        return;
       }
+
+      const accessToken = await AsyncStorage.getItem("googleAccessToken");
+      if (!accessToken) {
+        Alert.alert(
+          "Sesión expirada",
+          "Vuelve a iniciar sesión con Google para subir tu evidencia.",
+        );
+        setSubiendoEvidencia(false);
+        return;
+      }
+
+      const archivo = resultado.assets[0];
+      if (!archivo?.uri) {
+        Alert.alert(
+          "Archivo no disponible",
+          "No se pudo leer el archivo seleccionado.",
+        );
+        setSubiendoEvidencia(false);
+        return;
+      }
+
+      const evidenciaUrl = await subirEvidenciaDrive(
+        archivo.uri,
+        archivo.name ?? "evidencia",
+      );
 
       await tdiApi.subirEvidencia(
         inscripcion.inscripcionId,
@@ -457,7 +522,8 @@ export default function TDIScreen() {
     const color = EJE_COLORS[tdi.eje];
     const inscripcion = inscripciones[tdi.id];
     const estado = inscripcion?.estado;
-    const lleno = tdi.cupoActual >= tdi.cupoMaximo && !estado;
+    const lleno =
+      tdi.cupoMaximo !== null && tdi.cupoActual >= tdi.cupoMaximo && !estado;
 
     return (
       <TouchableOpacity
@@ -471,7 +537,7 @@ export default function TDIScreen() {
         <View style={[styles.cardAccent, { backgroundColor: color }]} />
         <View style={styles.cardBody}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardEmoji}>{tdi.emoji}</Text>
+            <Text style={styles.cardEmoji}>{tdi.emoji ?? "🎯"}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardNombre} numberOfLines={2}>
                 {tdi.nombre}
@@ -499,8 +565,8 @@ export default function TDIScreen() {
           </View>
 
           <View style={{ gap: 2, marginBottom: 8 }}>
-            <Text style={styles.metaItem}>📅 {tdi.fecha}</Text>
-            <Text style={styles.metaItem}>📍 {tdi.lugar}</Text>
+            <Text style={styles.metaItem}>📅 {tdi.fecha ?? "Por definir"}</Text>
+            <Text style={styles.metaItem}>📍 {tdi.lugar ?? "Por definir"}</Text>
             <Text style={styles.metaItem}>
               ⏱ {tdi.horasRequeridas}h · 🏅 {tdi.tdisporGanar} TDI's
             </Text>
@@ -570,7 +636,7 @@ export default function TDIScreen() {
             <Text style={styles.cardEmoji}>📋</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardNombre} numberOfLines={2}>
-                {sol.nombre}
+                {sol.nombre_solicitud}
               </Text>
               <Text style={styles.cardEje}>{sol.eje}</Text>
             </View>
@@ -581,31 +647,11 @@ export default function TDIScreen() {
             </View>
           </View>
 
-          <Text style={styles.metaItem}>🏢 {sol.organizacion}</Text>
+          <Text style={styles.metaItem}>🏢 {sol.persona_encargada}</Text>
           <Text style={styles.metaItem}>
-            ⏱ {sol.horasRealizadas} horas · 📅 Enviada {sol.fechaEnvio}
+            ⏱ {sol.horas_requeridas} horas · 📅 Enviada{" "}
+            {new Date(sol.created_at).toLocaleDateString()}
           </Text>
-
-          {sol.observacionesAdmin && (
-            <View
-              style={[
-                styles.notaAdmin,
-                sol.estado === "Aprobada" && {
-                  backgroundColor: "#D1FAE5",
-                  borderLeftColor: "#10B981",
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.notaAdminText,
-                  sol.estado === "Aprobada" && { color: "#065F46" },
-                ]}
-              >
-                💬 {sol.observacionesAdmin}
-              </Text>
-            </View>
-          )}
         </View>
       </TouchableOpacity>
     );
@@ -777,6 +823,7 @@ export default function TDIScreen() {
                 const inscripcion = inscripciones[tdiSeleccionado.id];
                 const estado = inscripcion?.estado;
                 const lleno =
+                  tdiSeleccionado.cupoMaximo !== null &&
                   tdiSeleccionado.cupoActual >= tdiSeleccionado.cupoMaximo &&
                   !estado;
                 return (
@@ -794,7 +841,7 @@ export default function TDIScreen() {
                         <Text style={styles.modalCloseText}>✕</Text>
                       </TouchableOpacity>
                       <Text style={styles.modalEmoji}>
-                        {tdiSeleccionado.emoji}
+                        {tdiSeleccionado.emoji ?? "🎯"}
                       </Text>
                       <Text style={styles.modalTitulo}>
                         {tdiSeleccionado.nombre}
@@ -817,7 +864,10 @@ export default function TDIScreen() {
                             lbl: "TDI's",
                           },
                           {
-                            num: `${tdiSeleccionado.cupoMaximo - tdiSeleccionado.cupoActual}`,
+                            num:
+                              tdiSeleccionado.cupoMaximo !== null
+                                ? `${tdiSeleccionado.cupoMaximo - tdiSeleccionado.cupoActual}`
+                                : "∞",
                             lbl: "Cupos libres",
                           },
                         ].map((s) => (
@@ -832,7 +882,7 @@ export default function TDIScreen() {
                         {
                           icono: "📅",
                           titulo: "Fecha y lugar",
-                          texto: `${tdiSeleccionado.fecha}\n${tdiSeleccionado.lugar}`,
+                          texto: `${tdiSeleccionado.fecha ?? "Por definir"}\n${tdiSeleccionado.lugar ?? "Por definir"}`,
                         },
                         {
                           icono: "🎯",
@@ -1067,7 +1117,7 @@ export default function TDIScreen() {
                       </TouchableOpacity>
                       <Text style={styles.modalEmoji}>📋</Text>
                       <Text style={styles.modalTitulo}>
-                        {solicitudVista.nombre}
+                        {solicitudVista.nombre_solicitud}
                       </Text>
                       <View
                         style={[styles.estadoPill, { backgroundColor: cfg.bg }]}
@@ -1087,11 +1137,16 @@ export default function TDIScreen() {
                       <View style={styles.statsRow}>
                         {[
                           {
-                            num: `${solicitudVista.horasRealizadas}h`,
+                            num: `${solicitudVista.horas_requeridas}h`,
                             lbl: "Horas",
                           },
                           { num: solicitudVista.eje.split(" ")[0], lbl: "Eje" },
-                          { num: solicitudVista.fechaEnvio, lbl: "Enviada" },
+                          {
+                            num: new Date(
+                              solicitudVista.created_at,
+                            ).toLocaleDateString(),
+                            lbl: "Enviada",
+                          },
                         ].map((s) => (
                           <View key={s.lbl} style={styles.statBox}>
                             <Text style={[styles.statNum, { fontSize: 14 }]}>
@@ -1102,45 +1157,11 @@ export default function TDIScreen() {
                         ))}
                       </View>
 
-                      {solicitudVista.observacionesAdmin && (
-                        <View
-                          style={[
-                            styles.notaAdminModal,
-                            {
-                              borderLeftColor: cfg.color,
-                              backgroundColor: cfg.bg,
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.notaAdminTitulo,
-                              { color: cfg.color },
-                            ]}
-                          >
-                            {cfg.emoji} Respuesta del equipo TDI
-                          </Text>
-                          <Text
-                            style={[
-                              styles.notaAdminTexto,
-                              { color: cfg.color },
-                            ]}
-                          >
-                            {solicitudVista.observacionesAdmin}
-                          </Text>
-                        </View>
-                      )}
-
                       {[
                         {
-                          icono: "🏢",
-                          titulo: "Organización",
-                          texto: solicitudVista.organizacion,
-                        },
-                        {
-                          icono: "📝",
-                          titulo: "Descripción",
-                          texto: solicitudVista.descripcion,
+                          icono: "👤",
+                          titulo: "Contacto en la organización",
+                          texto: `${solicitudVista.persona_encargada} · ${solicitudVista.puesto}\n✉️ ${solicitudVista.correo} · 📞 ${solicitudVista.telefono}`,
                         },
                         {
                           icono: "🎯",
@@ -1204,9 +1225,8 @@ export default function TDIScreen() {
                               { color: cfg.color },
                             ]}
                           >
-                            ❌ No fue aprobada. Revisa las observaciones y
-                            considera volver a intentarlo con los ajustes
-                            sugeridos.
+                            ❌ No fue aprobada. Considera volver a intentarlo
+                            con los ajustes sugeridos.
                           </Text>
                         )}
                       </View>
@@ -1263,25 +1283,19 @@ export default function TDIScreen() {
                   <Text style={styles.avisoText}>
                     💡 Una vez aprobada, tu actividad aparecerá en el catálogo
                     como <Text style={{ fontWeight: "700" }}>externa</Text> y
-                    podrás inscribirte formalmente.
+                    otros compañeros podrán inscribirse formalmente.
                   </Text>
                 </View>
 
                 <Campo
-                  campo="nombre"
+                  campo="matricula"
+                  label="Tu matrícula *"
+                  placeholder="Ej. 21040123"
+                />
+                <Campo
+                  campo="nombreSolicitud"
                   label="Nombre de la actividad *"
                   placeholder="Ej. Voluntariado en banco de alimentos"
-                />
-                <Campo
-                  campo="organizacion"
-                  label="Organización o institución *"
-                  placeholder="Ej. Cruz Roja Querétaro"
-                />
-                <Campo
-                  campo="correoContacto"
-                  label="Correo de contacto"
-                  placeholder="contacto@organizacion.mx"
-                  keyboardType="email-address"
                 />
 
                 <View style={styles.campoGroup}>
@@ -1332,15 +1346,52 @@ export default function TDIScreen() {
                   placeholder="¿En qué consistió? ¿Qué hiciste?"
                   multiline
                 />
+
+                <View style={styles.avisoBox}>
+                  <Text style={styles.avisoText}>
+                    📇 Datos de la persona que puede confirmar tu participación
+                    (supervisor, coordinador, etc.)
+                  </Text>
+                </View>
+
+                <Campo
+                  campo="personaEncargada"
+                  label="Nombre del encargado/a *"
+                  placeholder="Ej. María López"
+                />
+                <Campo
+                  campo="puesto"
+                  label="Puesto *"
+                  placeholder="Ej. Coordinadora de voluntariado"
+                />
+                <Campo
+                  campo="telefono"
+                  label="Teléfono de contacto *"
+                  placeholder="Ej. 4421234567"
+                  keyboardType="phone-pad"
+                />
+                <Campo
+                  campo="extension"
+                  label="Extensión (opcional)"
+                  placeholder="Ej. 102"
+                  keyboardType="numeric"
+                />
+                <Campo
+                  campo="correo"
+                  label="Correo de contacto *"
+                  placeholder="contacto@organizacion.mx"
+                  keyboardType="email-address"
+                />
+
                 <Campo
                   campo="competencias"
-                  label="Competencias desarrolladas"
+                  label="Competencias desarrolladas *"
                   placeholder="Trabajo en equipo, liderazgo..."
                   multiline
                 />
                 <Campo
                   campo="evidencias"
-                  label="Evidencias que puedes presentar"
+                  label="Evidencias que puedes presentar *"
                   placeholder="Fotos, carta, certificado..."
                   multiline
                 />
@@ -1521,15 +1572,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   btnAccionText: { color: "#fff", fontSize: 13, fontWeight: "700" },
-  notaAdmin: {
-    marginTop: 8,
-    backgroundColor: "#FEF3C7",
-    borderLeftWidth: 3,
-    borderLeftColor: "#F59E0B",
-    borderRadius: 6,
-    padding: 8,
-  },
-  notaAdminText: { fontSize: 12, color: "#92400E" },
   cupoContainer: { marginVertical: 6 },
   cupoBarBg: {
     height: 6,
@@ -1599,14 +1641,6 @@ const styles = StyleSheet.create({
   },
   seccionTexto: { fontSize: 14, color: "#4B5563", lineHeight: 21 },
   seccionSub: { fontSize: 13, color: "#6B7280", marginTop: 3 },
-  notaAdminModal: {
-    borderLeftWidth: 4,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 20,
-  },
-  notaAdminTitulo: { fontSize: 13, fontWeight: "700", marginBottom: 4 },
-  notaAdminTexto: { fontSize: 14, lineHeight: 20 },
   infoEstado: {
     borderWidth: 1.5,
     borderRadius: 12,

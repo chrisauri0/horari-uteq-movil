@@ -112,7 +112,7 @@ export default function HomeScreen() {
         // router.push("/login-register");
       }
 
-      const schedulesRes = await api.get("/scheduler/allschedules");
+      const schedulesRes = await api.get("/scheduler");
       await AsyncStorage.setItem(
         "horarios",
         JSON.stringify(schedulesRes.data.schedules),
