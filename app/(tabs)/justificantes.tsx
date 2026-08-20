@@ -1,18 +1,23 @@
-// app/(tabs)/justificantes.tsx  (o donde te convenga)
+// app/(tabs)/justificantes.tsx
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui";
 import api from "@/services/api";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type EstadoJustificante = "pendiente" | "aceptado" | "rechazado";
@@ -34,21 +39,32 @@ const DRIVE_FILE_URL = (fileId: string) =>
   `https://www.googleapis.com/drive/v3/files/${fileId}?fields=webViewLink`;
 
 export default function JustificantesScreen() {
+  const router = useRouter();
   const [justificantes, setJustificantes] = useState<Justificante[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  // ── Modal de motivo/fecha antes de elegir archivo ──────────────────────
+  const [modalVisible, setModalVisible] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const [fecha, setFecha] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const fetchJustificantes = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get("/justificantes/mios");
-      setJustificantes(res.data.justificantes ?? []);
-    } catch (err) {
+      // 👈 fix: el backend regresa el arreglo directo, no { justificantes: [...] }
+      setJustificantes(res.data ?? []);
+    } catch (err: any) {
       console.log("Error fetching justificantes:", err);
+      if (err?.response?.status === 401) {
+        router.replace("/login-register");
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     fetchJustificantes();
@@ -66,7 +82,6 @@ export default function JustificantesScreen() {
     return token;
   };
 
-  // Sube el archivo a Drive usando multipart (metadata + binario en un solo request)
   const uploadToDrive = async (
     accessToken: string,
     file: DocumentPicker.DocumentPickerAsset,
@@ -76,7 +91,6 @@ export default function JustificantesScreen() {
       mimeType: file.mimeType ?? "application/octet-stream",
     };
 
-    // Leemos el archivo como blob usando fetch (funciona en RN con uri local)
     const fileResponse = await fetch(file.uri);
     const fileBlob = await fileResponse.blob();
 
@@ -84,7 +98,6 @@ export default function JustificantesScreen() {
     const delimiter = `\r\n--${boundary}\r\n`;
     const closeDelim = `\r\n--${boundary}--`;
 
-    // Convertimos el blob a base64 para meterlo en el multipart manualmente
     const base64Data = await blobToBase64(fileBlob);
 
     const multipartBody =
@@ -115,7 +128,6 @@ export default function JustificantesScreen() {
     const uploadJson = await uploadRes.json();
     const fileId = uploadJson.id as string;
 
-    // Damos permiso de lectura a "cualquiera con el link" para que tu backend/admin lo pueda abrir
     await fetch(DRIVE_PERMISSIONS_URL(fileId), {
       method: "POST",
       headers: {
@@ -138,14 +150,24 @@ export default function JustificantesScreen() {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        // quitamos el prefijo "data:...;base64,"
         resolve(result.split(",")[1]);
       };
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
 
-  const handlePickAndUpload = async () => {
+  const abrirModal = () => {
+    setMotivo("");
+    setFecha(new Date());
+    setModalVisible(true);
+  };
+
+  const handleConfirmarYSubir = async () => {
+    if (!motivo.trim()) {
+      Alert.alert("Campo requerido", "Escribe el motivo del justificante.");
+      return;
+    }
+
     const result = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/*"],
       copyToCacheDirectory: true,
@@ -157,22 +179,25 @@ export default function JustificantesScreen() {
     const accessToken = await getAccessToken();
     if (!accessToken) return;
 
+    setModalVisible(false);
     setUploading(true);
     try {
       const driveUrl = await uploadToDrive(accessToken, file);
 
-      // Aquí podrías abrir un modal para pedir motivo/fecha antes del POST,
-      // de momento un ejemplo simple:
       await api.post("/justificantes", {
         driveUrl,
-        motivo: "Justificante subido desde la app",
-        fecha: new Date().toISOString(),
+        motivo: motivo.trim(),
+        fecha: fecha.toISOString(),
       });
 
       Alert.alert("Listo", "Tu justificante se subió correctamente.");
       fetchJustificantes();
-    } catch (err) {
+    } catch (err: any) {
       console.log("Error subiendo justificante:", err);
+      if (err?.response?.status === 401) {
+        router.replace("/login-register");
+        return;
+      }
       Alert.alert("Error", "No se pudo subir el justificante.");
     } finally {
       setUploading(false);
@@ -200,7 +225,7 @@ export default function JustificantesScreen() {
 
       <Button
         title={uploading ? "Subiendo..." : "Subir justificante"}
-        onPress={handlePickAndUpload}
+        onPress={abrirModal}
         variant="primary"
         size="large"
         fullWidth
@@ -217,6 +242,8 @@ export default function JustificantesScreen() {
           data={justificantes}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          refreshing={loading}
+          onRefresh={fetchJustificantes}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
@@ -240,6 +267,68 @@ export default function JustificantesScreen() {
           }
         />
       )}
+
+      {/* Modal: motivo + fecha antes de elegir el archivo */}
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <ThemedText type="subtitle" style={styles.modalTitle}>
+              Nuevo justificante
+            </ThemedText>
+
+            <ThemedText style={styles.fieldLabel}>Motivo</ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder="Ej. Cita médica, trámite familiar..."
+              placeholderTextColor="#9CA3AF"
+              value={motivo}
+              onChangeText={setMotivo}
+              multiline
+            />
+
+            <ThemedText style={styles.fieldLabel}>Fecha de la falta</ThemedText>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <ThemedText>{fecha.toLocaleDateString()}</ThemedText>
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={fecha}
+                mode="date"
+                display="default"
+                maximumDate={new Date()}
+                onChange={(_, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) setFecha(selectedDate);
+                }}
+              />
+            )}
+
+            <View style={styles.modalButtons}>
+              <Button
+                title="Cancelar"
+                onPress={() => setModalVisible(false)}
+                variant="secondary"
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Continuar"
+                onPress={handleConfirmarYSubir}
+                variant="primary"
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -267,4 +356,45 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   badgeText: { color: "#fff", fontSize: 12, fontWeight: "600" },
   empty: { textAlign: "center", opacity: 0.6, marginTop: 40 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "#00000066",
+    justifyContent: "center",
+    padding: 20,
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+  },
+  modalTitle: { marginBottom: 16 },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  input: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    minHeight: 44,
+  },
+  dateButton: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 20,
+  },
 });
