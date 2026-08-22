@@ -91,24 +91,29 @@ export default function LoginScreen() {
       }
 
       // Guarda TU JWT, no el accessToken de Google
-      // await AsyncStorage.setItem("token", res.data.token);
-
-      // LoginScreen.tsx
-      await AsyncStorage.setItem("access_token", res.data.token); // antes decía "token"
+      await AsyncStorage.setItem("access_token", res.data.token);
       await AsyncStorage.setItem("user", JSON.stringify(res.data.user));
 
-      // Ahora sí, con tu JWT ya guardado, tu interceptor de axios (api/api2)
-      // debe agregarlo automático a las siguientes llamadas
-      const schedulesRes = await api.get("/scheduler/allschedules");
-      await AsyncStorage.setItem(
-        "horarios",
-        JSON.stringify(schedulesRes.data.schedules),
-      );
+      // 👇 Prefetch de horarios: separado en su propio try/catch.
+      // Si falla, no debe bloquear el login ni mostrar un mensaje de error falso.
+      try {
+        const schedulesRes = await api.get("/scheduler"); // 👈 ruta corregida
+        await AsyncStorage.setItem(
+          "horarios",
+          JSON.stringify(
+            schedulesRes.data.schedules ?? schedulesRes.data ?? [],
+          ),
+        );
+      } catch (prefetchErr) {
+        console.log("No se pudo precargar horarios (no crítico):", prefetchErr);
+        // No mostramos alert aquí — el login ya fue exitoso.
+        // HomeScreen se encarga de reintentar la carga cuando monte.
+      }
 
       Alert.alert("Bienvenido", res.data.user.full_name);
       router.push("/");
     } catch (err) {
-      console.log(err);
+      console.log("Error en login:", err);
       Alert.alert("Error", "No se pudo iniciar sesión.");
     }
   };

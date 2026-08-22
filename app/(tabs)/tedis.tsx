@@ -408,8 +408,6 @@ export default function TDIScreen() {
         copyToCacheDirectory: true,
       });
 
-      // 👇 Fix: si el usuario cancela el picker, no se envía la evidencia.
-      // Antes esto seguía adelante con evidenciaUrl = "" y marcaba como enviada.
       if (resultado.canceled) {
         setSubiendoEvidencia(false);
         return;
@@ -438,6 +436,7 @@ export default function TDIScreen() {
       const evidenciaUrl = await subirEvidenciaDrive(
         archivo.uri,
         archivo.name ?? "evidencia",
+        archivo.mimeType ?? "application/octet-stream", // 👈 mimeType real del picker
       );
 
       await tdiApi.subirEvidencia(
@@ -457,14 +456,15 @@ export default function TDIScreen() {
       setNotaEvidencia("");
       setTdiSeleccionado(null);
       Alert.alert("Enviado ✅", "Tu evidencia fue enviada para revisión.");
-    } catch (err) {
+    } catch (err: any) {
       console.log("Error subiendo evidencia:", err);
-      Alert.alert("Error", "No se pudo subir tu evidencia. Intenta de nuevo.");
+      // 👇 mensaje real en vez del genérico, igual que hicimos en justificantes
+      const detalle = err?.message || "Error desconocido";
+      Alert.alert("Error al subir evidencia", detalle);
     } finally {
       setSubiendoEvidencia(false);
     }
   };
-
   // ── Filtrado catálogo ──────────────────────────────────────────────────────
 
   const tdisFiltrados = tdis.filter((t) => {

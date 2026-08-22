@@ -2,23 +2,23 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Button, Card, Input, ScheduleTable } from "@/components/ui";
 import {
-    BorderRadius,
-    FontSizes,
-    Spacing,
-    UTEQColors,
+  BorderRadius,
+  FontSizes,
+  Spacing,
+  UTEQColors,
 } from "@/constants/theme";
 import { api2 } from "@/services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 
 const DAYS = ["Lun", "Mar", "Mie", "Jue", "Vie"];
@@ -502,7 +502,7 @@ export default function PsicologosScreen() {
                 title="Cancelar"
                 onPress={closeModal}
                 variant="outline"
-                style={[styles.modalButton, styles.cancelButton]}
+                style={{ ...styles.modalButton, ...styles.cancelButton }}
                 textStyle={styles.cancelButtonText}
               />
               <Button
@@ -516,7 +516,7 @@ export default function PsicologosScreen() {
                   closeModal();
                 }}
                 variant="primary"
-                style={[styles.modalButton, styles.confirmButton]}
+                style={{ ...styles.modalButton, ...styles.confirmButton }}
                 textStyle={styles.confirmButtonText}
                 disabled={!selectedDay || !selectedHour}
               />

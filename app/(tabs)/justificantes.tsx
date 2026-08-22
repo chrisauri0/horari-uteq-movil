@@ -5,7 +5,6 @@ import { Button } from "@/components/ui";
 import api from "@/services/api";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
@@ -118,11 +117,10 @@ export default function JustificantesScreen() {
       },
       body: multipartBody,
     });
-
     if (!uploadRes.ok) {
       const errText = await uploadRes.text();
       console.log("Drive upload error:", errText);
-      throw new Error("No se pudo subir el archivo a Drive");
+      throw new Error(`Drive rechazó la subida: ${errText}`); // 👈 incluye el detalle real
     }
 
     const uploadJson = await uploadRes.json();
@@ -198,7 +196,9 @@ export default function JustificantesScreen() {
         router.replace("/login-register");
         return;
       }
-      Alert.alert("Error", "No se pudo subir el justificante.");
+      // 👇 Mostramos el mensaje real en vez de uno genérico, para depurar más rápido
+      const detalle = err?.message || "Error desconocido";
+      Alert.alert("Error al subir", detalle);
     } finally {
       setUploading(false);
     }
@@ -300,16 +300,43 @@ export default function JustificantesScreen() {
             </TouchableOpacity>
 
             {showDatePicker && (
-              <DateTimePicker
-                value={fecha}
-                mode="date"
-                display="default"
-                maximumDate={new Date()}
-                onChange={(_, selectedDate) => {
-                  setShowDatePicker(false);
-                  if (selectedDate) setFecha(selectedDate);
-                }}
-              />
+              <View style={styles.datePicker}>
+                <ThemedText style={styles.selectedDate}>
+                  {fecha.toLocaleDateString()}
+                </ThemedText>
+                <View style={styles.datePickerButtons}>
+                  <Button
+                    title="−"
+                    onPress={() => {
+                      const date = new Date(fecha);
+                      date.setDate(date.getDate() - 1);
+                      setFecha(date);
+                    }}
+                    variant="secondary"
+                  />
+                  <Button
+                    title="Hoy"
+                    onPress={() => setFecha(new Date())}
+                    variant="secondary"
+                  />
+                  <Button
+                    title="+"
+                    onPress={() => {
+                      const date = new Date(fecha);
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      date.setDate(date.getDate() + 1);
+                      if (date <= tomorrow) setFecha(date);
+                    }}
+                    variant="secondary"
+                  />
+                </View>
+                <Button
+                  title="Aceptar"
+                  onPress={() => setShowDatePicker(false)}
+                  variant="primary"
+                />
+              </View>
             )}
 
             <View style={styles.modalButtons}>
@@ -350,6 +377,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   cardMotivo: { fontSize: 16, fontWeight: "600" },
   cardFecha: { fontSize: 13, opacity: 0.7, marginTop: 4 },
   comentario: { fontSize: 13, marginTop: 6, fontStyle: "italic" },
@@ -367,12 +395,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
   },
-  modalTitle: { marginBottom: 16 },
+
+  modalTitle: {
+    marginBottom: 16,
+    color: "#111827", // 👈 nuevo
+  },
   fieldLabel: {
     fontSize: 13,
     fontWeight: "600",
     marginBottom: 6,
     marginTop: 10,
+    color: "#111827", // 👈 nuevo
   },
   input: {
     backgroundColor: "#F9FAFB",
@@ -391,6 +424,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
+  },
+  datePicker: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    color: "#111827", // 👈 nuevo
+  },
+  selectedDate: {
+    textAlign: "center",
+    marginBottom: 10,
+    fontWeight: "600",
+    color: "#111827", // 👈 nuevo
+  },
+  datePickerButtons: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 10,
   },
   modalButtons: {
     flexDirection: "row",

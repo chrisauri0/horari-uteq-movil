@@ -1,23 +1,21 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system";
-
+import * as FileSystem from "expo-file-system/legacy"; // 👈 antes era "expo-file-system"
 export async function subirEvidenciaDrive(
-  localUri: string, // URI local del archivo (de expo-image-picker)
+  localUri: string,
   nombreArchivo: string,
+  mimeType: string = "application/octet-stream",
 ): Promise<string> {
   const accessToken = await AsyncStorage.getItem("googleAccessToken");
   if (!accessToken) throw new Error("No hay sesión de Google activa.");
 
-  // 1. Leer el archivo como base64
   const base64 = await FileSystem.readAsStringAsync(localUri, {
     encoding: "base64",
   });
 
-  // 2. Subir a Drive con multipart upload
   const metadata = {
     name: nombreArchivo,
-    mimeType: "image/jpeg",
-    parents: ["root"], // o un folder ID específico si quieres organizar
+    mimeType,
+    // 👈 quitamos "parents": ["root"] — se sube a la raíz por default, igual que justificantes
   };
 
   const boundary = "TDI_EVIDENCIA_BOUNDARY";
@@ -26,7 +24,7 @@ export async function subirEvidenciaDrive(
     `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
     `${JSON.stringify(metadata)}\r\n` +
     `--${boundary}\r\n` +
-    `Content-Type: image/jpeg\r\n` +
+    `Content-Type: ${mimeType}\r\n` +
     `Content-Transfer-Encoding: base64\r\n\r\n` +
     `${base64}\r\n` +
     `--${boundary}--`;
@@ -50,7 +48,6 @@ export async function subirEvidenciaDrive(
 
   const { id, webViewLink } = await uploadRes.json();
 
-  // 3. Hacer el archivo público (para que tu admin lo pueda ver)
   await fetch(`https://www.googleapis.com/drive/v3/files/${id}/permissions`, {
     method: "POST",
     headers: {
@@ -60,6 +57,5 @@ export async function subirEvidenciaDrive(
     body: JSON.stringify({ role: "reader", type: "anyone" }),
   });
 
-  // 4. Devolver solo la URL 👇 esto es lo que va a tu backend
   return webViewLink;
 }
